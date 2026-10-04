@@ -9,7 +9,14 @@ import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { buildCategoryTree, type Category } from '@/lib/categories'
 import type { TransactionStatus, TransactionType } from '@/lib/finance/types'
-import { buildTransactionsHref, hasActiveFilters, type TransactionFilters, type TransactionsQuery } from '@/lib/transaction-filters'
+import {
+  buildTransactionsHref,
+  hasActiveFilters,
+  normalizeSearch,
+  SEARCH_MAX_LENGTH,
+  type TransactionFilters,
+  type TransactionsQuery,
+} from '@/lib/transaction-filters'
 
 type ToolbarProps = {
   query: TransactionsQuery
@@ -71,12 +78,19 @@ function FilterControls({ query, categories, accounts, onChange }: ToolbarProps 
 export function TransactionsToolbar({ query, categories, accounts }: ToolbarProps) {
   const router = useRouter()
   const [text, setText] = useState(query.q)
+  // Next preserva o estado ao mudar só a URL: ressincroniza quando o q da URL muda por fora (ex.: menu "Lançamentos")
+  const [syncedQ, setSyncedQ] = useState(query.q)
+  if (query.q !== syncedQ) {
+    setSyncedQ(query.q)
+    setText(query.q)
+  }
   const active = hasActiveFilters(query.filters)
   const activeCount = Object.values(query.filters).filter(Boolean).length
 
   useEffect(() => {
-    if (text.trim() === query.q) return
-    const timer = setTimeout(() => router.replace(buildTransactionsHref(query, { q: text.trim() })), 300)
+    const q = normalizeSearch(text)
+    if (q === query.q) return
+    const timer = setTimeout(() => router.replace(buildTransactionsHref(query, { q })), 300)
     return () => clearTimeout(timer)
   }, [text, query, router])
 
@@ -92,6 +106,7 @@ export function TransactionsToolbar({ query, categories, accounts }: ToolbarProp
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder="Buscar em todos os meses"
+            maxLength={SEARCH_MAX_LENGTH}
             aria-label="Buscar por descrição"
             className="pl-8"
           />

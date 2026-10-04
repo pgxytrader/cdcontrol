@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { buildTransactionsHref, escapeLike, filterParams, hasActiveFilters, parseTransactionsQuery } from './transaction-filters'
+import {
+  buildTransactionsHref,
+  escapeLike,
+  filterParams,
+  hasActiveFilters,
+  normalizeSearch,
+  parseTransactionsQuery,
+} from './transaction-filters'
 
 const now = new Date('2026-10-15T12:00:00Z')
 const ACC = '11111111-1111-4111-8111-111111111111'
@@ -55,6 +62,15 @@ describe('filterParams e buildTransactionsHref', () => {
   it('hasActiveFilters', () => {
     expect(hasActiveFilters({})).toBe(false)
     expect(hasActiveFilters({ status: 'paid' })).toBe(true)
+  })
+})
+
+describe('normalizeSearch', () => {
+  it('é a mesma normalização do parâmetro q (evita loop com texto longo colado)', () => {
+    const long = 'a'.repeat(150)
+    expect(normalizeSearch('  luz  ')).toBe('luz')
+    expect(normalizeSearch(long)).toBe(parseTransactionsQuery({ q: long }, now).q)
+    expect(normalizeSearch(long)).toHaveLength(100)
   })
 })
 

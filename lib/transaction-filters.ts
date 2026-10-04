@@ -28,6 +28,13 @@ function validUuid(value: string | undefined): string | undefined {
   return value && uuidSchema.safeParse(value).success ? value : undefined
 }
 
+export const SEARCH_MAX_LENGTH = 100
+
+/** Normalização do texto de busca (igual no servidor e no campo de busca). */
+export function normalizeSearch(text: string): string {
+  return text.trim().slice(0, SEARCH_MAX_LENGTH)
+}
+
 /** Lê os parâmetros da URL de /lancamentos; valores inválidos são ignorados. */
 export function parseTransactionsQuery(params: Params, now: Date = new Date()): TransactionsQuery {
   const filters: TransactionFilters = {}
@@ -41,7 +48,7 @@ export function parseTransactionsQuery(params: Params, now: Date = new Date()): 
   if (status) filters.status = status
   return {
     ym: resolveYearMonth(params.mes, now),
-    q: (first(params.q) ?? '').trim().slice(0, 100),
+    q: normalizeSearch(first(params.q) ?? ''),
     filters,
   }
 }
