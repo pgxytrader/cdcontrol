@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatBRL, parseBRL } from './money'
+import { formatBRL, formatSignedBRL, parseBRL } from './money'
 
 // Intl usa espaço não separável (U+00A0) depois de "R$"
 const plain = (value: string) => value.replace(/\u00a0/g, ' ')
@@ -43,4 +43,12 @@ describe('parseBRL', () => {
       expect(parseBRL(input)).toBeNull()
     },
   )
+})
+
+describe('formatSignedBRL', () => {
+  it('mostra o sinal explícito', () => {
+    expect(plain(formatSignedBRL(1050))).toBe('+ R$ 10,50')
+    expect(plain(formatSignedBRL(-1050))).toBe('− R$ 10,50')
+    expect(plain(formatSignedBRL(0))).toBe('R$ 0,00')
+  })
 })

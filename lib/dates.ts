@@ -61,3 +61,52 @@ export function formatYearMonthLabel({ year, month }: YearMonth): string {
 export function formatDateBR(value: string | Date): string {
   return dateBR.format(typeof value === 'string' ? new Date(value) : value)
 }
+
+const isoDateFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+/** Data de hoje (AAAA-MM-DD) no fuso de São Paulo. */
+export function todayISO(now: Date = new Date()): string {
+  return isoDateFormat.format(now)
+}
+
+/** Intervalo [start, end) do mês, em AAAA-MM-DD. */
+export function monthBounds(ym: YearMonth): { start: string; end: string } {
+  return {
+    start: `${formatYearMonthParam(ym)}-01`,
+    end: `${formatYearMonthParam(shiftYearMonth(ym, 1))}-01`,
+  }
+}
+
+function parseISODate(iso: string): { year: number; month: number; day: number } {
+  const [year, month, day] = iso.split('-').map(Number)
+  return { year, month, day }
+}
+
+/** Soma dias a uma data de calendário (sem fuso). */
+export function addDaysISO(iso: string, days: number): string {
+  const { year, month, day } = parseISODate(iso)
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10)
+}
+
+export function yearMonthOfISO(iso: string): YearMonth {
+  const { year, month } = parseISODate(iso)
+  return { year, month }
+}
+
+/** AAAA-MM-DD → dd/mm/aaaa, sem conversão de fuso. */
+export function formatISODateBR(iso: string): string {
+  const [year, month, day] = iso.split('-')
+  return `${day}/${month}/${year}`
+}
+
+/** "Domingo, 4 de outubro". */
+export function formatDayHeading(iso: string): string {
+  const { year, month, day } = parseISODate(iso)
+  const label = format(new Date(year, month - 1, day), "EEEE, d 'de' MMMM", { locale: ptBR })
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}

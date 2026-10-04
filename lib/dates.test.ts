@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addDaysISO,
   currentYearMonth,
   formatDateBR,
+  formatDayHeading,
+  formatISODateBR,
   formatYearMonthLabel,
   formatYearMonthParam,
+  monthBounds,
   parseYearMonth,
   resolveYearMonth,
   shiftYearMonth,
+  todayISO,
+  yearMonthOfISO,
 } from './dates'
 
 describe('currentYearMonth', () => {
@@ -72,5 +78,38 @@ describe('formatação', () => {
     // 02:30 UTC de 11/10 = 23:30 de 10/10 em São Paulo
     expect(formatDateBR('2026-10-11T02:30:00Z')).toBe('10/10/2026')
     expect(formatDateBR(new Date('2026-01-05T15:00:00Z'))).toBe('05/01/2026')
+  })
+})
+
+describe('datas de calendário (AAAA-MM-DD)', () => {
+  it('todayISO usa o fuso de São Paulo', () => {
+    // 02:30 UTC de 05/10 = 23:30 de 04/10 em São Paulo
+    expect(todayISO(new Date('2026-10-05T02:30:00Z'))).toBe('2026-10-04')
+    expect(todayISO(new Date('2026-10-05T03:30:00Z'))).toBe('2026-10-05')
+  })
+
+  it('monthBounds devolve [início, início do mês seguinte)', () => {
+    expect(monthBounds({ year: 2026, month: 10 })).toEqual({ start: '2026-10-01', end: '2026-11-01' })
+    expect(monthBounds({ year: 2026, month: 12 })).toEqual({ start: '2026-12-01', end: '2027-01-01' })
+  })
+
+  it('addDaysISO atravessa meses e anos', () => {
+    expect(addDaysISO('2026-03-01', -1)).toBe('2026-02-28')
+    expect(addDaysISO('2026-12-31', 1)).toBe('2027-01-01')
+    expect(addDaysISO('2026-10-04', -90)).toBe('2026-07-06')
+  })
+
+  it('yearMonthOfISO extrai ano e mês', () => {
+    expect(yearMonthOfISO('2026-03-15')).toEqual({ year: 2026, month: 3 })
+  })
+
+  it('formatISODateBR não desloca o fuso', () => {
+    expect(formatISODateBR('2026-10-04')).toBe('04/10/2026')
+    expect(formatISODateBR('2027-01-01')).toBe('01/01/2027')
+  })
+
+  it('formatDayHeading escreve o dia por extenso', () => {
+    expect(formatDayHeading('2026-10-04')).toBe('Domingo, 4 de outubro')
+    expect(formatDayHeading('2026-03-02')).toBe('Segunda-feira, 2 de março')
   })
 })

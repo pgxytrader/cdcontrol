@@ -48,3 +48,9 @@ export function parseBRL(input: string): number | null {
   if (!Number.isSafeInteger(cents)) return null
   return negative && cents !== 0 ? -cents : cents
 }
+
+/** Valor com sinal explícito: "+ R$ 10,50", "− R$ 10,50" (U+2212) ou "R$ 0,00". */
+export function formatSignedBRL(cents: number): string {
+  if (cents === 0) return formatBRL(0)
+  return `${cents > 0 ? '+' : '−'} ${formatBRL(Math.abs(cents))}`
+}
