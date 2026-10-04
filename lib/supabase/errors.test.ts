@@ -20,3 +20,20 @@ describe('translateError', () => {
     expect(translateError(undefined)).toBe(GENERIC_ERROR)
   })
 })
+
+describe('erros das finanças', () => {
+  it('traduz os códigos novos', () => {
+    expect(translateError({ code: 'P0001', message: 'INVALID_PARENT' })).toBe(
+      'A categoria-mãe precisa ser do mesmo tipo e não pode ser uma subcategoria.',
+    )
+    expect(translateError({ code: 'P0001', message: 'INVALID_ACCOUNT' })).toBe('Conta inválida.')
+    expect(translateError({ code: 'P0001', message: 'INVALID_CATEGORY' })).toBe('Categoria inválida.')
+    expect(translateError({ code: 'P0001', message: 'CATEGORY_KIND_MISMATCH' })).toBe(
+      'A categoria não combina com o tipo do lançamento.',
+    )
+    expect(translateError({ code: '23503', message: 'update or delete violates foreign key' })).toBe(
+      'Não é possível excluir: há lançamentos ou subcategorias vinculados. Arquive em vez de excluir.',
+    )
+    expect(translateError({ code: '23505', message: 'duplicate key value' })).toBe('Este registro já existe.')
+  })
+})

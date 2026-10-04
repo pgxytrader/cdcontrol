@@ -14,6 +14,13 @@ const MESSAGES: Record<string, string> = {
   INVITE_USED: 'Este código já foi usado.',
   INVITE_EXPIRED: 'Este código expirou. Peça um novo.',
   HOUSEHOLD_FULL: 'Esta casa já tem 2 membros.',
+  INVALID_PARENT: 'A categoria-mãe precisa ser do mesmo tipo e não pode ser uma subcategoria.',
+  INVALID_ACCOUNT: 'Conta inválida.',
+  INVALID_CATEGORY: 'Categoria inválida.',
+  CATEGORY_KIND_MISMATCH: 'A categoria não combina com o tipo do lançamento.',
+  // Postgres
+  '23503': 'Não é possível excluir: há lançamentos ou subcategorias vinculados. Arquive em vez de excluir.',
+  '23505': 'Este registro já existe.',
 }
 
 /** Traduz erros do Supabase (Auth, PostgREST ou RPC) para uma mensagem em pt-BR. */
