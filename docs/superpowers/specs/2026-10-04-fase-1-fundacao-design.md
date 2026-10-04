@@ -68,11 +68,11 @@ gusfer/
 |---|---|
 | `--background` | `--background` #0B0F14 |
 | `--card`, `--popover` | `--surface` #131A22 |
-| `--input`, `--muted`, `--accent` | `--surface-2` #1B2430 |
-| `--border` | `--border` #263241 |
+| `--muted`, `--accent`, `--secondary` | `--surface-2` #1B2430 |
+| `--border`, `--input` | `--border` #263241 (o `Input` do shadcn é ajustado para fundo `surface-2`) |
 | `--foreground` | `--text` #E6EDF3 |
 | `--muted-foreground` | `--text-muted` #8B98A5 |
-| `--primary` | `--primary` #3B82F6 |
+| `--primary` | `--primary` #3B82F6 (texto do botão em #0B0F14: contraste 5,2:1; branco daria 3,7:1 e reprovaria no AA) |
 | `--destructive` | `--expense` #EF4444 |
 
 Tokens extras expostos ao Tailwind: `income`, `expense`, `warning`, `surface`, `surface-2`. Valores monetários usam `tabular-nums` e ficam alinhados à direita. `<html lang="pt-BR">`.
@@ -97,6 +97,7 @@ Roles e enums são `text` com `check`, não tipos enum do Postgres (mais fáceis
 - `set_updated_at()` — trigger `before update`.
 - `handle_new_user()` — trigger `after insert on auth.users`, cria o `profiles`. A migration também faz backfill (`insert into profiles select id from auth.users on conflict do nothing`) para usuários criados antes dela.
 - `is_household_member(hid uuid) returns boolean` — `stable`; verifica `household_members` para `auth.uid()`.
+- `shares_household_with(other uuid) returns boolean` — `stable`; usada na policy de `profiles`.
 - `create_household(p_name text) returns uuid` — erro se o usuário já pertence a alguma casa; insere `households` e `household_members` (role `owner`) na mesma transação. Ponto de extensão: a Fase 2 adiciona aqui o seed de categorias.
 - `create_invite() returns table(code text, expires_at timestamptz)` — exige ser membro de uma casa; falha com `HOUSEHOLD_FULL` se a casa já tem 2 membros; marca como expirados (`expires_at = now()`) os convites não usados da casa; gera código de 6 caracteres do alfabeto `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (sem 0/O, 1/I/L); repete em caso de colisão; validade `now() + interval '7 days'`.
 - `redeem_invite(p_code text) returns uuid` — normaliza para maiúsculas e sem espaços; `select ... for update` no convite; falha com mensagens distintas para: código inexistente, já usado, expirado, casa cheia (≥ 2 membros), usuário já tem casa. Em sucesso insere o membro (role `member`), preenche `used_at`/`used_by` e retorna o `household_id`.
@@ -134,7 +135,7 @@ RLS habilitado em todas as tabelas.
 
 ## 7. Código: convenções
 
-- Mutações via Server Actions em `actions.ts` ao lado da rota. Cada action valida a entrada com o mesmo schema zod do formulário e retorna `{ ok: true } | { ok: false, error: string, fieldErrors? }`.
+- Mutações via Server Actions em `lib/actions/` (compartilhadas entre onboarding e configurações). Cada action valida a entrada com o mesmo schema zod do formulário e retorna `{ ok: true } | { ok: false, error: string, fieldErrors? }`.
 - Formulários com react-hook-form + `zodResolver`.
 - Erros do Supabase Auth e das RPCs traduzidos para pt-BR em `lib/supabase/errors.ts` (ex.: `invalid_credentials` → "E-mail ou senha incorretos"). As RPCs lançam erros com códigos próprios (`INVITE_NOT_FOUND`, `INVITE_USED`, `INVITE_EXPIRED`, `HOUSEHOLD_FULL`, `ALREADY_MEMBER`) mapeados para mensagens.
 - Toasts com o componente `sonner` do shadcn.
@@ -156,7 +157,7 @@ RLS habilitado em todas as tabelas.
 
   9. `signUp` com a anon key é recusado (prova que o cadastro público está desligado).
 
-  A criação e a limpeza (apagar usuários de teste, o que remove as casas em cascata) usam `SUPABASE_SERVICE_ROLE_KEY` lida **apenas** de `.env.test.local`, que nunca é importado pelo app.
+  A criação e a limpeza (apagar as casas criadas e depois os usuários de teste) usam `SUPABASE_SERVICE_ROLE_KEY` lida **apenas** de `.env.test.local`, que nunca é importado pelo app.
 - **Manual:** rodar `npm run dev` e verificar as telas em 360px e 1440px.
 
 ## 9. Deploy
