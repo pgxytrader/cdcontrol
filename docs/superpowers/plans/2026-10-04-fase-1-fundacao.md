@@ -175,7 +175,7 @@ export default defineConfig({
 ```
 # Copie para .env.local e preencha com os dados do projeto Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://SEU-PROJETO.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-anon-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sua-anon-key
 ```
 
 No `.gitignore` gerado existe a linha `.env*`. Logo abaixo dela, adicione:
@@ -1096,7 +1096,7 @@ git commit -m "feat(ui): tema escuro do PRD com shadcn e layout raiz pt-BR" -m "
 
 **Interfaces:**
 - Consumes: nada
-- Produces: CLI vinculado ao projeto remoto (`supabase link`), `.env.local` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `.env.test.local` com as mesmas duas e mais `SUPABASE_SERVICE_ROLE_KEY`
+- Produces: CLI vinculado ao projeto remoto (`supabase link`), `.env.local` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `.env.test.local` com as mesmas duas e mais `SUPABASE_SERVICE_ROLE_KEY`
 
 - [ ] **Step 1: PARAR e pedir ao usuário (checkpoint humano)**
 
@@ -1120,13 +1120,13 @@ Expected: `supabase/config.toml` existe. Se o `init` perguntar sobre configuraç
 `.env.local`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=<url>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<anon key>
 ```
 
 `.env.test.local`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=<url>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<anon key>
 SUPABASE_SERVICE_ROLE_KEY=<service_role key>
 ```
 
@@ -1174,7 +1174,7 @@ function loadTestEnv(): Record<string, string> {
   try {
     return parseEnv(readFileSync('.env.test.local', 'utf8')) as Record<string, string>
   } catch {
-    throw new Error('Crie .env.test.local com NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY e SUPABASE_SERVICE_ROLE_KEY')
+    throw new Error('Crie .env.test.local com NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY e SUPABASE_SERVICE_ROLE_KEY')
   }
 }
 
@@ -1207,7 +1207,7 @@ function requireEnv(name: string): string {
 }
 
 const url = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
-const anonKey = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+const anonKey = requireEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY')
 const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 const noSession = { auth: { persistSession: false, autoRefreshToken: false } }
 
@@ -1789,10 +1789,10 @@ Avise o usuário: em **Authentication → Users → Add user → Create new user
 
 ```ts
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 
 if (!url || !anonKey) {
-  throw new Error('Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY (veja .env.example)')
+  throw new Error('Defina NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (veja .env.example)')
 }
 
 export const supabaseEnv = { url, anonKey }
@@ -3408,13 +3408,13 @@ No primeiro acesso, cada um informa o nome. O primeiro cria a casa e gera um có
 ## Testes
 
 - `npm test`: regras puras em `lib/` (sem banco).
-- `npm run test:rls`: integração contra o projeto Supabase. Precisa de `.env.test.local` com `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY`. Cria e apaga usuários de teste. A service_role key **nunca** vai para o app nem para a Vercel.
+- `npm run test:rls`: integração contra o projeto Supabase. Precisa de `.env.test.local` com `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` e `SUPABASE_SERVICE_ROLE_KEY`. Cria e apaga usuários de teste. A service_role key **nunca** vai para o app nem para a Vercel.
 
 ## Deploy (Vercel)
 
 1. Crie um repositório no GitHub e faça o push deste projeto.
 2. Na Vercel, importe o repositório.
-3. Defina as variáveis `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+3. Defina as variáveis `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 4. Faça o deploy. Como não há fluxos por e-mail, não é preciso configurar Site URL nem Redirect URLs no Supabase.
 ````
 

@@ -140,7 +140,7 @@ RLS habilitado em todas as tabelas.
 - Erros do Supabase Auth e das RPCs traduzidos para pt-BR em `lib/supabase/errors.ts` (ex.: `invalid_credentials` → "E-mail ou senha incorretos"). As RPCs lançam erros com códigos próprios (`INVITE_NOT_FOUND`, `INVITE_USED`, `INVITE_EXPIRED`, `HOUSEHOLD_FULL`, `ALREADY_MEMBER`) mapeados para mensagens.
 - Toasts com o componente `sonner` do shadcn.
 - `lib/finance/money.ts`: `formatBRL(cents)`, `parseBRL(input) → cents | null`, usando `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`. Entra já na Fase 1 por ser base de todas as outras.
-- Variáveis de ambiente: `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` em `.env.local`. `.env.example` versionado; `.env*.local` no `.gitignore`.
+- Variáveis de ambiente: `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` em `.env.local`. `.env.example` versionado; `.env*.local` no `.gitignore`.
 
 ## 8. Testes
 
@@ -165,7 +165,7 @@ RLS habilitado em todas as tabelas.
 O repositório git fica em `gusfer/`. No fim da fase, com ações do usuário:
 
 1. Criar o repositório no GitHub (manual ou via `gh`) e fazer o push.
-2. Importar na Vercel e definir `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+2. Importar na Vercel e definir `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
 Como não há fluxos por e-mail, não é preciso configurar Site URL nem Redirect URLs no Supabase.
 
