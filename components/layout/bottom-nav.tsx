@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { isActive, MORE_NAV, NAV, type NavItem } from './nav-items'
-import { QuickAddSheetButton } from './quick-add'
+import { QuickAddFab } from './quick-add'
 
 function itemClass(active: boolean) {
   return cn(
@@ -91,7 +91,7 @@ export function BottomNav() {
           <BottomNavLink item={NAV.lancamentos} pathname={pathname} />
         </li>
         <li className="flex items-center justify-center">
-          <QuickAddSheetButton />
+          <QuickAddFab />
         </li>
         <li>
           <BottomNavLink item={NAV.cartoes} pathname={pathname} />

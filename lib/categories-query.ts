@@ -1,5 +1,6 @@
 import 'server-only'
-import type { Category, CategoryKind } from '@/lib/categories'
+import { rankCategories, type Category, type CategoryKind } from '@/lib/categories'
+import { addDaysISO, todayISO } from '@/lib/dates'
 import { createClient } from '@/lib/supabase/server'
 
 type CategoryRow = {
@@ -35,4 +36,21 @@ export async function listCategories(): Promise<Category[]> {
     .order('name')
   if (error) throw error
   return data.map(toCategory)
+}
+
+/** Categorias mais usadas do tipo nos últimos 90 dias (chips do formulário). */
+export async function topCategoryIds(kind: CategoryKind, limit = 6): Promise<string[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('category_id')
+    .eq('type', kind)
+    .gte('date', addDaysISO(todayISO(), -90))
+    .order('date', { ascending: false })
+    .limit(500)
+  if (error) throw error
+  return rankCategories(
+    data.map((row) => row.category_id),
+    limit,
+  )
 }

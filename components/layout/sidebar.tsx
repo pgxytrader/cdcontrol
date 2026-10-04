@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { ALL_NAV, isActive } from './nav-items'
-import { QuickAddDialogButton } from './quick-add'
+import { QuickAddButton } from './quick-add'
 
 /** Menu lateral fixo do desktop (≥ 1024px). */
 export function Sidebar({ householdName }: { householdName: string }) {
@@ -15,7 +15,7 @@ export function Sidebar({ householdName }: { householdName: string }) {
         <p className="text-lg font-semibold">CD</p>
         <p className="truncate text-sm text-muted-foreground">{householdName}</p>
       </div>
-      <QuickAddDialogButton />
+      <QuickAddButton />
       <nav aria-label="Navegação principal">
         <ul className="space-y-1">
           {ALL_NAV.map((item) => {

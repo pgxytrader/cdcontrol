@@ -10,7 +10,7 @@ export const getMyProfile = cache(async () => {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('profiles')
-    .select('user_id, display_name')
+    .select('user_id, display_name, last_account_id')
     .eq('user_id', user.id)
     .maybeSingle()
   if (error) throw error
