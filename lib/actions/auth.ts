@@ -19,6 +19,7 @@ export async function signIn(input: unknown): Promise<ActionResult> {
 
 export async function signOut(): Promise<void> {
   const supabase = await createClient()
-  await supabase.auth.signOut()
+  // Só este aparelho: sair no celular não derruba a sessão do computador
+  await supabase.auth.signOut({ scope: 'local' })
   redirect('/login')
 }

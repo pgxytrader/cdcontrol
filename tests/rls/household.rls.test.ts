@@ -131,6 +131,38 @@ describe('casa compartilhada: RLS e convites', () => {
     expect(error?.message).toBe('HOUSEHOLD_FULL')
   })
 
+  it('membro não altera o perfil do outro nem troca o próprio user_id', async () => {
+    await b.client.from('profiles').update({ display_name: 'Invasor' }).eq('user_id', a.id)
+    const { data } = await admin.from('profiles').select('display_name').eq('user_id', a.id).single()
+    expect(data?.display_name).toBeNull()
+
+    const swap = await b.client.from('profiles').update({ user_id: a.id }).eq('user_id', b.id)
+    expect(swap.error).not.toBeNull()
+  })
+
+  it('membro só edita o nome da casa, não o created_by', async () => {
+    const { error } = await a.client.from('households').update({ created_by: b.id }).eq('id', householdA)
+    expect(error).not.toBeNull()
+  })
+
+  it('membro não escreve diretamente em convites', async () => {
+    const insert = await a.client
+      .from('household_invites')
+      .insert({ household_id: householdA, code: 'ABCDEF', expires_at: new Date(Date.now() + 86_400_000).toISOString() })
+    expect(insert.error).not.toBeNull()
+
+    const update = await a.client.from('household_invites').update({ used_at: null }).eq('household_id', householdA)
+    expect(update.error).not.toBeNull()
+  })
+
+  it('anônimo não lê nenhuma tabela', async () => {
+    const anon = createClient(url, publishableKey, noSession)
+    for (const table of ['households', 'household_members', 'household_invites', 'profiles']) {
+      const { data } = await anon.from(table).select('*')
+      expect(data ?? []).toEqual([])
+    }
+  })
+
   it('quem já tem casa não cria outra nem entra em outra', async () => {
     await createHousehold(c, 'Casa RLS C')
 
