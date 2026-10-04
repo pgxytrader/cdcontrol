@@ -1,5 +1,6 @@
-import { LogOut } from 'lucide-react'
+import { LogOut, Tags } from 'lucide-react'
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { PageHeader } from '@/components/layout/page-header'
 import { DisplayNameForm } from '@/components/profile/display-name-form'
@@ -72,6 +73,21 @@ export default async function SettingsPage() {
             </CardContent>
           </Card>
         ) : null}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Categorias</CardTitle>
+            <CardDescription>Receitas e despesas, com subcategorias, ícones e cores.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/configuracoes/categorias">
+                <Tags className="size-4" aria-hidden />
+                Gerenciar categorias
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
