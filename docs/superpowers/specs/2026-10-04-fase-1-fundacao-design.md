@@ -4,15 +4,15 @@ Data: 04/10/2026 · Referência geral: [docs/PRD.md](../../PRD.md) (seções 3, 
 
 ## Objetivo
 
-Entregar o esqueleto funcional do CD: projeto Next.js com tema escuro e layout responsivo, Supabase na nuvem com a base do schema e RLS, e o fluxo completo de cadastro, login, recuperação de senha, criação da casa e convite do parceiro. Nenhuma funcionalidade financeira entra nesta fase; as telas do app existem como placeholders navegáveis.
+Entregar o esqueleto funcional do CD: projeto Next.js com tema escuro e layout responsivo, Supabase na nuvem com a base do schema e RLS, e o fluxo de login, criação da casa e convite do parceiro. Nenhuma funcionalidade financeira entra nesta fase; as telas do app existem como placeholders navegáveis.
 
 ## Decisões tomadas no brainstorming
 
 | Tema | Decisão |
 |---|---|
 | Supabase | Projeto na nuvem (plano grátis). Sem Docker. Migrations aplicadas com `supabase db push`. |
-| Confirmação de e-mail | Desligada. Cadastrou, entra. O e-mail fica reservado para recuperação de senha. |
-| Cadastro | Aberto a qualquer pessoa. O RLS isola cada casa. |
+| Usuários | Desvio do PRD: **sem cadastro pelo app**. Os dois usuários (Gustavo e Paula) são criados pelo painel do Supabase com "Auto Confirm User". O cadastro público fica desligado no Supabase ("Allow new users to sign up" = off), para que ninguém se cadastre pela API. |
+| Recuperação de senha | Desvio do PRD: fora do MVP. Troca de senha é feita pelo painel do Supabase. Sem e-mails transacionais. |
 | Schema | Incremental: cada fase cria as próprias tabelas. A Fase 1 cria só a base. |
 | `display_name` | Desvio do PRD: fica **só** em `profiles`, não em `household_members`. |
 | Casas por usuário | Uma casa por usuário no MVP (regra das funções RPC; o schema não impede mais). |
@@ -28,13 +28,12 @@ Versões estáveis em 04/10/2026: Next.js 16.3 (App Router), React 19.3, TypeScr
 ```
 gusfer/
   app/
-    (auth)/login/            cadastro/       recuperar-senha/   redefinir-senha/
-    (onboarding)/bem-vindo/  ← criar casa OU entrar com código
+    (auth)/login/
+    (onboarding)/bem-vindo/  ← seu nome + criar casa OU entrar com código
     (app)/layout.tsx         ← AppShell: BottomNav (mobile) + Sidebar (desktop) + Fab
     (app)/inicio/ lancamentos/ cartoes/ parcelas/ contas/ imovel/
           relatorios/ orcamento/  ← placeholders
     (app)/configuracoes/     ← funcional na Fase 1
-    auth/callback/route.ts   ← troca o code do e-mail por sessão
   components/ui/             ← shadcn
   components/layout/         ← BottomNav, Sidebar, MoreSheet, MonthSelector, Fab
   lib/supabase/              ← client.ts (browser), server.ts (RSC/actions), proxy.ts (sessão)
@@ -89,14 +88,14 @@ Colunas comuns (onde aplicável): `id uuid pk default gen_random_uuid()`, `creat
 | `households` | id, name (1–80 chars), created_by, created_at, updated_at | |
 | `household_members` | household_id → households, user_id → auth.users, role (`owner`, `member`), created_at | PK (household_id, user_id); `on delete cascade` em ambos |
 | `household_invites` | id, household_id → households, code (unique, 6 chars), expires_at, used_at, used_by → auth.users, created_by, created_at, updated_at | |
-| `profiles` | user_id pk → auth.users (`on delete cascade`), display_name (1–60 chars), avatar_url, created_at, updated_at | Criado por trigger em `auth.users` insert, com `display_name` vindo de `raw_user_meta_data->>'display_name'` |
+| `profiles` | user_id pk → auth.users (`on delete cascade`), display_name (nullable, 1–60 chars quando preenchido), avatar_url, created_at, updated_at | Criado por trigger em `auth.users` insert, com `display_name` vazio (usuários criados pelo painel não têm nome); o nome é preenchido em `/bem-vindo` |
 
 Roles e enums são `text` com `check`, não tipos enum do Postgres (mais fáceis de alterar via migration).
 
 ### 5.2 Funções (todas `security definer`, `set search_path = ''`, nomes qualificados com `public.`)
 
 - `set_updated_at()` — trigger `before update`.
-- `handle_new_user()` — trigger `after insert on auth.users`, cria o `profiles`.
+- `handle_new_user()` — trigger `after insert on auth.users`, cria o `profiles`. A migration também faz backfill (`insert into profiles select id from auth.users on conflict do nothing`) para usuários criados antes dela.
 - `is_household_member(hid uuid) returns boolean` — `stable`; verifica `household_members` para `auth.uid()`.
 - `create_household(p_name text) returns uuid` — erro se o usuário já pertence a alguma casa; insere `households` e `household_members` (role `owner`) na mesma transação. Ponto de extensão: a Fase 2 adiciona aqui o seed de categorias.
 - `create_invite() returns table(code text, expires_at timestamptz)` — exige ser membro de uma casa; falha com `HOUSEHOLD_FULL` se a casa já tem 2 membros; marca como expirados (`expires_at = now()`) os convites não usados da casa; gera código de 6 caracteres do alfabeto `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (sem 0/O, 1/I/L); repete em caso de colisão; validade `now() + interval '7 days'`.
@@ -123,33 +122,29 @@ RLS habilitado em todas as tabelas.
 
 ## 6. Telas e fluxos
 
-1. **Cadastro** (`/cadastro`): nome, e-mail, senha (mín. 8) e confirmação de senha. `signUp` com `options.data.display_name`. Sucesso → `/bem-vindo`.
-2. **Login** (`/login`): e-mail e senha. Links para cadastro e para recuperar senha.
-3. **Recuperar senha** (`/recuperar-senha`): e-mail → `resetPasswordForEmail` com `redirectTo = <site>/auth/callback?next=/redefinir-senha`. Sempre mostra a mesma mensagem de sucesso, para não revelar quais e-mails existem.
-4. **Callback** (`/auth/callback`): `exchangeCodeForSession(code)` e redirect para `next` (só caminhos internos são aceitos).
-5. **Redefinir senha** (`/redefinir-senha`): nova senha + confirmação → `updateUser({ password })` → `/inicio`.
-6. **Boas-vindas** (`/bem-vindo`): dois cartões, "Criar nossa casa" (campo nome, com sugestão "Casa de <seu nome>") e "Tenho um código de convite" (campo de 6 caracteres, maiúsculas automáticas). Sucesso → `/inicio`.
-7. **Configurações** (`/configuracoes`):
+1. **Login** (`/login`): e-mail e senha, sem links de cadastro ou recuperação. Sucesso → `/inicio` (o layout redireciona para `/bem-vindo` se ainda não houver casa).
+2. **Boas-vindas** (`/bem-vindo`): primeiro o campo "Como você quer ser chamado(a)?" (preenchido se o perfil já tiver nome); depois dois cartões, "Criar nossa casa" (campo nome, com sugestão "Casa de <seu nome>") e "Tenho um código de convite" (campo de 6 caracteres, maiúsculas automáticas). A ação salva o nome no `profiles` e chama a RPC. Sucesso → `/inicio`.
+3. **Configurações** (`/configuracoes`):
    - **Casa:** editar o nome.
    - **Perfil:** editar o próprio nome.
    - **Membros:** lista com nome e papel.
    - **Convite:** visível enquanto a casa tem menos de 2 membros. Mostra o convite ativo (código, botão copiar, "válido até dd/mm/aaaa") ou o botão "Gerar código".
    - **Sair:** `signOut` → `/login`.
-8. **Início e demais telas do app:** título da tela, seletor de mês e um estado vazio "Disponível em breve".
+4. **Início e demais telas do app:** título da tela, seletor de mês e um estado vazio "Disponível em breve".
 
 ## 7. Código: convenções
 
 - Mutações via Server Actions em `actions.ts` ao lado da rota. Cada action valida a entrada com o mesmo schema zod do formulário e retorna `{ ok: true } | { ok: false, error: string, fieldErrors? }`.
 - Formulários com react-hook-form + `zodResolver`.
-- Erros do Supabase Auth e das RPCs traduzidos para pt-BR em `lib/supabase/errors.ts` (ex.: `invalid_credentials` → "E-mail ou senha incorretos"; `user_already_exists` → "Já existe uma conta com este e-mail"). As RPCs lançam erros com códigos próprios (`INVITE_NOT_FOUND`, `INVITE_USED`, `INVITE_EXPIRED`, `HOUSEHOLD_FULL`, `ALREADY_MEMBER`) mapeados para mensagens.
+- Erros do Supabase Auth e das RPCs traduzidos para pt-BR em `lib/supabase/errors.ts` (ex.: `invalid_credentials` → "E-mail ou senha incorretos"). As RPCs lançam erros com códigos próprios (`INVITE_NOT_FOUND`, `INVITE_USED`, `INVITE_EXPIRED`, `HOUSEHOLD_FULL`, `ALREADY_MEMBER`) mapeados para mensagens.
 - Toasts com o componente `sonner` do shadcn.
 - `lib/finance/money.ts`: `formatBRL(cents)`, `parseBRL(input) → cents | null`, usando `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`. Entra já na Fase 1 por ser base de todas as outras.
 - Variáveis de ambiente: `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` em `.env.local`. `.env.example` versionado; `.env*.local` no `.gitignore`.
 
 ## 8. Testes
 
-- **Unitários (`npm test`, Vitest):** `money.ts` (formatação, parse com e sem "R$", vírgula/ponto, valores inválidos, negativos) e os schemas zod (cadastro, login, nome da casa, código de convite).
-- **Integração RLS (`npm run test:rls`, Vitest com config separada):** roda contra o projeto na nuvem. Cria usuários de teste com e-mails aleatórios via `signUp` (anon key) e cobre:
+- **Unitários (`npm test`, Vitest):** `money.ts` (formatação, parse com e sem "R$", vírgula/ponto, valores inválidos, negativos) e os schemas zod (login, nome do usuário, nome da casa, código de convite).
+- **Integração RLS (`npm run test:rls`, Vitest com config separada):** roda contra o projeto na nuvem. Como o cadastro público está desligado, cria usuários de teste com e-mails aleatórios via `auth.admin.createUser({ email_confirm: true })` (cliente service_role) e faz login com cada um via `signInWithPassword` (cliente anon, que é o que o teste exercita). Cobre:
   1. A cria uma casa e um convite.
   2. B (sem casa) não lê `households`, `household_members`, `household_invites` nem o `profiles` de A.
   3. B não consegue inserir em `household_members` diretamente.
@@ -159,7 +154,9 @@ RLS habilitado em todas as tabelas.
   7. C cria a própria casa; depois tenta criar outra e tenta resgatar um convite, e ambos são recusados (`ALREADY_MEMBER`).
   8. Código expirado é recusado (`INVITE_EXPIRED`): o teste ajusta `expires_at` para o passado usando o cliente service_role.
 
-  A limpeza (apagar usuários de teste, o que remove as casas em cascata) usa `SUPABASE_SERVICE_ROLE_KEY` lida **apenas** de `.env.test.local`, que nunca é importado pelo app.
+  9. `signUp` com a anon key é recusado (prova que o cadastro público está desligado).
+
+  A criação e a limpeza (apagar usuários de teste, o que remove as casas em cascata) usam `SUPABASE_SERVICE_ROLE_KEY` lida **apenas** de `.env.test.local`, que nunca é importado pelo app.
 - **Manual:** rodar `npm run dev` e verificar as telas em 360px e 1440px.
 
 ## 9. Deploy
@@ -168,7 +165,8 @@ O repositório git fica em `gusfer/`. No fim da fase, com ações do usuário:
 
 1. Criar o repositório no GitHub (manual ou via `gh`) e fazer o push.
 2. Importar na Vercel e definir `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-3. No Supabase (Authentication → URL Configuration): Site URL = URL da Vercel; Redirect URLs incluem `<vercel>/auth/callback` (o `localhost` já foi incluído no início).
+
+Como não há fluxos por e-mail, não é preciso configurar Site URL nem Redirect URLs no Supabase.
 
 Esse checklist fica no `README.md`.
 
@@ -176,16 +174,16 @@ Esse checklist fica no `README.md`.
 
 - Criar o projeto em supabase.com e informar a URL, a anon key e a service_role key (esta só para `.env.test.local`).
 - Rodar `npx supabase login` para o CLI poder vincular o projeto (`supabase link`) e aplicar migrations.
-- No painel do Supabase: desligar "Confirm email" (Authentication → Providers → Email) e adicionar `http://localhost:3000/auth/callback` às Redirect URLs (Authentication → URL Configuration).
+- No painel do Supabase (Authentication → Sign In / Providers): desligar "Allow new users to sign up".
+- No painel do Supabase (Authentication → Users → Add user → Create new user): criar os usuários do Gustavo e da Paula com "Auto Confirm User" marcado. Isso pode ser feito depois que as migrations forem aplicadas, para o trigger já criar os `profiles`; usuários criados antes ganham o perfil por um backfill na própria migration.
 
 ## 11. Critérios de aceite da Fase 1
 
-1. Dois usuários se cadastram; um cria a casa e gera o convite; o outro entra com o código; os dois veem a mesma casa e os mesmos membros em Configurações.
+1. Os dois usuários criados no painel fazem login; um informa o nome, cria a casa e gera o convite; o outro informa o nome e entra com o código; os dois veem a mesma casa e os mesmos membros em Configurações.
 2. `npm run test:rls` passa.
-3. A recuperação de senha funciona de ponta a ponta (e-mail → link → nova senha → logado).
-4. Todas as telas funcionam sem rolagem horizontal em 360px e usam o espaço em 1440px (menu lateral + conteúdo até 1280px).
-5. `npm test`, `npm run lint` e `npm run build` passam sem erros.
+3. Todas as telas funcionam sem rolagem horizontal em 360px e usam o espaço em 1440px (menu lateral + conteúdo até 1280px).
+4. `npm test`, `npm run lint` e `npm run build` passam sem erros.
 
 ## Fora do escopo da Fase 1
 
-Contas, categorias, lançamentos e qualquer tabela financeira; formulário de lançamento; avatar (a coluna existe, sem upload); sair da casa ou remover membro; deploy automatizado além do checklist.
+Cadastro pelo app e recuperação de senha (desvios do PRD, ver decisões); contas, categorias, lançamentos e qualquer tabela financeira; formulário de lançamento; avatar (a coluna existe, sem upload); sair da casa ou remover membro; deploy automatizado além do checklist.
