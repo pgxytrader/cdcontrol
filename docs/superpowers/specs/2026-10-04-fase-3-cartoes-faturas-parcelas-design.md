@@ -108,7 +108,7 @@ Coluna nova `last_credit_card_id uuid references credit_cards on delete set null
 - **`ensure_invoice(p_card_id, p_closing_month, p_closing_date, p_due_date, p_reference_month) returns uuid`**: insere com `on conflict (credit_card_id, closing_month) do nothing` e devolve o id.
 - **`create_card_purchase(p_plan jsonb, p_rows jsonb) returns uuid[]`**: numa transação, cria as faturas que faltam (os ciclos vêm em cada linha), insere o plano (se houver) e as linhas; devolve os ids dos lançamentos. Qualquer erro desfaz tudo.
 - **`apply_card_schedule(p_card_id, p_closing_day, p_due_day, p_invoices jsonb, p_plans jsonb, p_moves jsonb)`**: numa transação, atualiza os dias do cartão, as datas (`closing_date`, `due_date`, `reference_month`) das faturas do conjunto recalculado, o `first_closing_month` dos planos afetados, cria faturas que faltem e move cada lançamento para a fatura do `closing_month` indicado.
-- **`restore_card_transactions(p_plan jsonb, p_rows jsonb)`**: reinsere plano (se veio no snapshot) e linhas com os mesmos ids, para o "Desfazer".
+- **`restore_transactions(p_plan jsonb, p_rows jsonb)`**: reinsere plano (se veio no snapshot) e linhas com os mesmos ids, para o "Desfazer" de qualquer exclusão (conta, cartão, pagamento ou parcelas).
 
 `grant execute` para `authenticated`; `revoke` de `anon` e `public`.
 
@@ -153,7 +153,7 @@ A descrição salva é a da compra ("Geladeira"); o sufixo "(3/10)" é montado n
 Regras de `rescheduleCard`:
 
 1. O **conjunto recalculado** são as faturas abertas antes da mudança (`today < closingDate` com os dias antigos). Cada uma mantém seu `closing_month` e ganha datas por `cycleForClosingMonth(newSchedule, closing_month)`, mesmo que o novo fechamento já tenha passado.
-2. Lançamentos dessas faturas são reposicionados: à vista por `cycleForDate(newSchedule, date)`; parcelas por `first_closing_month + (k−1)`, onde planos **normais** recalculam `first_closing_month` a partir de `purchase_date` e planos **em andamento** mantêm o valor (não há data real da compra).
+2. Lançamentos dessas faturas são reposicionados: à vista por `cycleForDate(newSchedule, date)`; parcelas por `first_closing_month + (k−1)`, onde planos **normais** cuja parcela 1 ainda está numa fatura do conjunto recalculado recalculam `first_closing_month` a partir de `purchase_date` (nunca antes da fatura recalculada mais antiga); planos **em andamento** e planos que já começaram a ser cobrados em fatura fechada mantêm o valor.
 3. Faturas fechadas antes da mudança não mudam e **não recebem** lançamentos. Se o destino for uma delas, o lançamento vai para a fatura de menor `closing_month` do conjunto recalculado.
 4. Um destino sem fatura existente gera fatura nova (o RPC cria).
 
@@ -182,21 +182,21 @@ Validação com zod em `lib/validation/`: `card.ts` (cartão), `invoice-payment.
 - `updateTransaction(id, input)`: lançamento no cartão **sem plano** tem edição completa; se cartão ou data mudam, `ensure_invoice` + update (falha no segundo passo deixa no máximo uma fatura vazia). Trocar de conta para cartão ou o contrário também é permitido nesse caso.
 - `updateInstallments(transactionId, scope: 'one' | 'future', { description, categoryId, notes })`: atualiza esta parcela ou as de `installment_number >=` a dela; com `'future'` atualiza também o plano.
 - `deleteInstallments(transactionId, scope)`: apaga esta parcela ou esta e as futuras; se o plano ficar vazio, apaga o plano. Devolve snapshot `{ plan \| null, rows }`.
-- `restoreTransactions(snapshot)`: chama `restore_card_transactions`.
+- `restoreTransactions(snapshot)`: chama `restore_transactions`.
 - `deleteTransaction` e `restoreTransaction` da Fase 2 continuam para lançamentos sem plano (inclui pagamentos de fatura).
 
 ### 3.3 `lib/actions/invoices.ts`
 
 - `payInvoice(invoiceId, { accountId, amountCents, date })`: insere `invoice_payment` com `credit_card_id` da fatura, `status = defaultStatus(date, today)` e descrição "Pagamento fatura {cartão} ({mmm/aaaa})". Valor acima do que falta gera aviso não bloqueante no formulário ("O excedente fica como crédito na fatura.").
-- Editar/excluir pagamento reaproveita `updateTransaction`/`deleteTransaction` (com "Desfazer").
+- `updateInvoicePayment(id, input)` edita conta, valor e data; excluir reaproveita `deleteTransaction` (com "Desfazer").
 
 Todas as actions revalidam `/lancamentos`, `/contas`, `/cartoes`, `/parcelas` e `/inicio`.
 
 ### 3.4 Consultas (server-only)
 
-- `lib/cards.ts`: `listCards({ includeArchived })` com `cardUsage` (sobre `v_invoice_totals`) e a fatura aberta atual (`cycleForDate(card, hoje)` + totais); `getCard(id)`.
-- `lib/invoices.ts`: `listInvoiceMonths(cardId)` (meses de referência existentes, mais o ciclo atual); `getInvoiceView(cardId, referenceMonth)` com ciclo, totais, `invoiceStatus`, lançamentos (compras, parcelas com `installments_count` do plano, estornos) e pagamentos. Se o mês não tem fatura salva, mostra a fatura vazia do ciclo calculado.
-- `lib/installments.ts`: `listUpcomingInstallments({ cardId? })` — parcelas cujas faturas têm `reference_month >=` mês atual, com plano e cartão.
+- `lib/cards.ts`: `listCards({ includeArchived })` com `cardUsage` (sobre `v_invoice_totals`) e a fatura aberta atual (`cycleForDate(card, hoje)` + totais); `listCardOptions()` para o formulário e os filtros.
+- `getCard(id)` devolve o cartão e os totais de todas as faturas dele; `listInvoiceTransactions(invoiceId)` (em `lib/transactions.ts`) traz compras, parcelas, estornos e pagamentos. A página calcula ciclo e `invoiceStatus`; se o ciclo não tem fatura salva, mostra a fatura vazia com as datas calculadas.
+- `lib/installments-query.ts`: `listUpcomingInstallments({ cardId? })` — parcelas cujas faturas têm `reference_month >=` mês atual, com plano e cartão.
 - `lib/transactions.ts`: `TRANSACTION_COLUMNS` com as colunas novas e `installment_plans(installments_count)`; filtro `cartao` (lançamentos com esse `credit_card_id`, inclusive pagamentos de fatura); tipo `invoice_payment` no filtro de tipo; filtro de status usando a regra de `effectiveStatus` (para `pending`: `status = 'pending'` fora das receitas/despesas no cartão — inclui pagamentos de fatura — **ou** receita/despesa no cartão com `date > hoje`; análogo para `paid`).
 
 ## 4. Telas
@@ -221,7 +221,7 @@ Todas as actions revalidam `/lancamentos`, `/contas`, `/cartoes`, `/parcelas` e 
 
 ### 4.3 Fatura (`/cartoes/[id]`)
 
-- Seletor "‹ Fatura de novembro 2026 ›" com o parâmetro `mes` (= `reference_month`); padrão: a fatura do ciclo atual.
+- Seletor "‹ Fatura de novembro 2026 ›" com o parâmetro `fatura=AAAA-MM` (mês de **fechamento**, a identidade do ciclo — dois ciclos podem ter o mesmo mês de referência quando o vencimento muda); o título mostra o mês do vencimento; padrão: a fatura do ciclo atual.
 - Cabeçalho: selo de status com texto (Aberta, Fechada, Paga, Vencida — vencida em destaque), fechamento e vencimento, **Total**, **Pago**, **Falta pagar**, limite usado e disponível do cartão.
 - Lista das compras da fatura por data: parcelas com "(3/10)", estornos com **+** (verde). Seção **Pagamentos** separada.
 - **Pagar fatura**: sheet/modal com conta (padrão: conta padrão do cartão), valor (padrão: falta pagar) e data (padrão: hoje).
