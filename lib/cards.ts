@@ -86,6 +86,12 @@ async function loadInvoiceTotals(supabase: SupabaseServer, cardId?: string): Pro
   }))
 }
 
+/** Totais de todas as faturas da casa (para o painel de faturas do Início). */
+export async function listInvoiceTotals(): Promise<InvoiceTotals[]> {
+  const supabase = await createClient()
+  return loadInvoiceTotals(supabase)
+}
+
 /** Por cartão, a soma das despesas de recorrência com data futura: só ocupam o limite quando a data chega. */
 async function loadFutureRecurring(supabase: SupabaseServer, today: string, cardId?: string): Promise<Map<string, number>> {
   const rows = await fetchAllPages((from, to) => {
