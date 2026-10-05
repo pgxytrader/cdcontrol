@@ -1,4 +1,4 @@
-import { LogOut, Tags } from 'lucide-react'
+import { Building2, LogOut, Tags } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -84,6 +84,21 @@ export default async function SettingsPage() {
               <Link href="/configuracoes/categorias">
                 <Tags className="size-4" aria-hidden />
                 Gerenciar categorias
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tipos de gasto do imóvel</CardTitle>
+            <CardDescription>Sinal, parcelas, ITBI, cartório e os demais tipos usados no Imóvel.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/configuracoes/tipos-de-gasto">
+                <Building2 className="size-4" aria-hidden />
+                Gerenciar tipos
               </Link>
             </Button>
           </CardContent>
