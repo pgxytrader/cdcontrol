@@ -1,14 +1,16 @@
 import type { Metadata } from 'next'
-import { EmptyText } from '@/components/dashboard/panel'
 import { PageHeader } from '@/components/layout/page-header'
 import { ExpenseFormButton } from '@/components/property/expense-form'
 import { ExpensesTab } from '@/components/property/expenses-tab'
+import { PlanFormButton } from '@/components/property/plan-form'
 import { PropertyFormButton } from '@/components/property/property-form'
 import { PropertyHeader } from '@/components/property/property-header'
 import { PropertyTabs } from '@/components/property/property-tabs'
+import { ScheduleTab } from '@/components/property/schedule-tab'
 import { SummaryTab } from '@/components/property/summary-tab'
+import { TypesTab } from '@/components/property/types-tab'
 import { todayISO } from '@/lib/dates'
-import { expenseStatus, propertySummary } from '@/lib/finance/property'
+import { expenseStatus, propertySchedule, propertySummary, totalsByType } from '@/lib/finance/property'
 import { listExpenseTypes, listProperties, listPropertyExpenses } from '@/lib/property'
 import { filterExpenses, parsePropertyQuery, type PropertyQuery } from '@/lib/property-filters'
 
@@ -50,6 +52,7 @@ export default async function PropertyPage({ searchParams }: Props) {
         actions={
           <>
             <ExpenseFormButton propertyId={property.id} types={types} today={today} />
+            <PlanFormButton propertyId={property.id} today={today} />
             <PropertyFormButton label="Editar imóvel" property={property} counts={counts} />
             <PropertyFormButton label="Novo imóvel" variant="ghost" />
           </>
@@ -72,8 +75,10 @@ export default async function PropertyPage({ searchParams }: Props) {
           today={today}
           openExpense={current.expenseId ? (expenses.find((expense) => expense.id === current.expenseId) ?? null) : null}
         />
+      ) : current.tab === 'cronograma' ? (
+        <ScheduleTab months={propertySchedule(expenses, property.expectedDeliveryDate, today)} />
       ) : (
-        <EmptyText>Esta seção chega nas próximas etapas.</EmptyText>
+        <TypesTab totals={totalsByType(expenses, types)} />
       )}
     </>
   )
