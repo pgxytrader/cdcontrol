@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { invalidInput, type ActionResult } from '@/lib/action-result'
-import { todayISO } from '@/lib/dates'
+import { formatISODateBR, todayISO } from '@/lib/dates'
 import {
   changeFollowing,
   changeSeries,
@@ -52,12 +52,25 @@ async function loadWithTransactions(supabase: SupabaseServer, recurrenceId: stri
   return { ...series, transactions }
 }
 
-async function apply(supabase: SupabaseServer, recurrenceId: string, change: SeriesChange): Promise<ActionResult> {
+async function apply(
+  supabase: SupabaseServer,
+  recurrenceId: string,
+  change: SeriesChange,
+  errorMessage: (error: { code?: string; message?: string }) => string = translateError,
+): Promise<ActionResult> {
   const { error } = await supabase.rpc('apply_recurrence_change', changeArgs(recurrenceId, change))
-  if (error) return { ok: false, error: translateError(error) }
+  if (error) return { ok: false, error: errorMessage(error) }
   done()
   return { ok: true, data: null }
 }
+
+/** Esta série já tem um lançamento na data escolhida (unique recurrence_id + occurrence_date). */
+function followingError(error: { code?: string; message?: string }): string {
+  return error.code === '23505' ? 'Já existe um lançamento desta série nessa data. Escolha outra data.' : translateError(error)
+}
+
+/** Encerrada = data final hoje ou antes (ativa = sem data final ou terminando depois de hoje). */
+const isEnded = (state: SeriesState, today: string) => state.endDate !== null && state.endDate <= today
 
 /** Valores novos do formulário rápido, validados pelo mesmo schema do lançamento. */
 function parseOccurrenceValues(input: unknown, source: 'account' | 'card'): { ok: true; values: OccurrenceValues } | { ok: false; result: ActionResult } {
@@ -95,7 +108,7 @@ export async function updateSeriesFollowing(id: unknown, input: unknown, source:
     today: todayISO(),
     card: context.card,
   })
-  return apply(supabase, loaded.state.id, change)
+  return apply(supabase, loaded.state.id, change, followingError)
 }
 
 /** "Excluir este e os próximos". Devolve o snapshot do "Desfazer". */
@@ -152,13 +165,22 @@ export async function updateRecurrence(id: unknown, input: unknown): Promise<Act
   const supabase = await createClient()
   const loaded = await loadWithTransactions(supabase, parsedId.data)
   if (!loaded) return { ok: false, error: GENERIC_ERROR }
-  if (loaded.state.endDate !== null && loaded.state.endDate < today) return { ok: false, error: 'Esta recorrência já foi encerrada.' }
+  if (isEnded(loaded.state, today)) return { ok: false, error: 'Esta recorrência já foi encerrada.' }
 
   const values = toSeriesEditValues(parsed.data)
   const context = await cardContextFor(supabase, values.creditCardId)
   if (!context.ok) return { ok: false, error: translateError({ message: 'INVALID_CARD' }) }
 
-  return apply(supabase, loaded.state.id, changeSeries(loaded.state, values, { transactions: loaded.transactions, today, card: context.card }))
+  const change = changeSeries(loaded.state, values, { transactions: loaded.transactions, today, card: context.card })
+  // Data final antes do início: o RPC apagaria a série inteira. A edição nunca chega lá.
+  if (change.series.endDate !== null && change.series.endDate < change.series.startDate) {
+    return {
+      ok: false,
+      error: 'Verifique os campos destacados.',
+      fieldErrors: { endDate: [`A data final precisa ser depois do início da série (${formatISODateBR(change.series.startDate)}).`] },
+    }
+  }
+  return apply(supabase, loaded.state.id, change)
 }
 
 /** Encerra hoje: as não realizadas depois de hoje saem; as pagas ficam. */
@@ -171,7 +193,7 @@ export async function endRecurrence(id: unknown): Promise<ActionResult> {
   if (!loaded) return { ok: false, error: GENERIC_ERROR }
 
   const today = todayISO()
-  if (loaded.state.endDate !== null && loaded.state.endDate < today) return { ok: false, error: 'Esta recorrência já foi encerrada.' }
+  if (isEnded(loaded.state, today)) return { ok: false, error: 'Esta recorrência já foi encerrada.' }
 
   return apply(supabase, loaded.state.id, endSeries(loaded.state, { transactions: loaded.transactions, today, card: null }))
 }

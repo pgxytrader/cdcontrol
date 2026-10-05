@@ -31,7 +31,8 @@ const CURRENT: SeriesState = {
   frequency: 'monthly',
   startDate: '2026-09-10',
   endDate: null,
-  generatedUntil: '2027-10-05',
+  // Geração feita até dezembro: as linhas de TRANSACTIONS são tudo o que existe até aqui
+  generatedUntil: '2026-12-31',
 }
 
 const tx = (id: string, occurrenceDate: string, status: 'paid' | 'pending'): SeriesTransaction => ({
@@ -48,6 +49,14 @@ const TRANSACTIONS = [tx('set', '2026-09-10', 'paid'), tx('out', '2026-10-10', '
 const CTX: ChangeContext = { transactions: TRANSACTIONS, today: TODAY, card: null }
 const occurrence = (id: string) => TRANSACTIONS.find((item) => item.id === id)!
 const dates = (change: Pick<SeriesChange, 'occurrences'>) => change.occurrences.map((item) => item.date)
+
+// Dezembro excluído com "Só este": não há linha de 10/12 dentro do que já foi gerado
+const SKIPPED_CTX: ChangeContext = { ...CTX, transactions: TRANSACTIONS.filter((item) => item.id !== 'dez') }
+
+// Novembro movido para o dia 15 com "este e os próximos": a âncora é 15/11 e outubro (10/10) segue pendente antes dela
+const MOVED: SeriesState = { ...CURRENT, startDate: '2026-11-15' }
+const MOVED_TRANSACTIONS = [tx('set', '2026-09-10', 'paid'), tx('out', '2026-10-10', 'pending'), tx('nov', '2026-11-15', 'pending'), tx('dez', '2026-12-15', 'pending')]
+const MOVED_CTX: ChangeContext = { transactions: MOVED_TRANSACTIONS, today: TODAY, card: null }
 
 describe('createSeries', () => {
   it('grava a primeira com o status do formulário e as demais pendentes até o horizonte', () => {
@@ -90,8 +99,21 @@ describe('changeFollowing', () => {
     expect(change.series).toEqual({ ...FIELDS, amountCents: 250_000, frequency: 'monthly', startDate: '2026-09-10', endDate: null })
     expect(change.deleteIds).toEqual(['out', 'nov'])
     expect(change.occurrences[0]).toEqual({ id: 'out', date: '2026-10-10', occurrenceDate: '2026-10-10', status: 'pending', cycle: null })
-    expect(dates(change)).toHaveLength(12)
-    expect(dates(change).slice(1, 3)).toEqual(['2026-11-10', '2026-12-10'])
+    // Novembro volta (substituída); dezembro está pago e fica; depois do que já foi gerado, até o horizonte
+    expect(dates(change)).toEqual([
+      '2026-10-10',
+      '2026-11-10',
+      '2027-01-10',
+      '2027-02-10',
+      '2027-03-10',
+      '2027-04-10',
+      '2027-05-10',
+      '2027-06-10',
+      '2027-07-10',
+      '2027-08-10',
+      '2027-09-10',
+    ])
+    expect(change.occurrences.slice(1).every((item) => item.id === undefined)).toBe(true)
     expect(change.generatedUntil).toBe('2027-10-05')
   })
 
@@ -101,6 +123,27 @@ describe('changeFollowing', () => {
     expect(change.occurrences[0]).toEqual({ id: 'out', date: '2026-10-15', occurrenceDate: '2026-10-15', status: 'paid', cycle: null })
     expect(dates(change)[1]).toBe('2026-11-15')
     expect(change.deleteIds).toEqual(['out', 'nov'])
+  })
+
+  it('mudando a data para depois da próxima pendente: ela é substituída, não duplicada', () => {
+    const change = changeFollowing(CURRENT, occurrence('out'), { ...FIELDS, date: '2026-11-15', status: 'pending' }, CTX)
+    expect(change.series.startDate).toBe('2026-11-15')
+    expect(change.deleteIds).toEqual(['out', 'nov'])
+    expect(change.occurrences[0]).toEqual({ id: 'out', date: '2026-11-15', occurrenceDate: '2026-11-15', status: 'pending', cycle: null })
+    expect(dates(change)).not.toContain('2026-11-10')
+    expect(dates(change).slice(1, 3)).toEqual(['2026-12-15', '2027-01-15'])
+  })
+
+  it('não traz de volta a ocorrência excluída com "Só este"', () => {
+    const change = changeFollowing(CURRENT, occurrence('out'), { ...FIELDS, amountCents: 250_000, date: '2026-10-10', status: 'pending' }, SKIPPED_CTX)
+    expect(change.deleteIds).toEqual(['out', 'nov'])
+    expect(dates(change)).not.toContain('2026-12-10')
+    expect(dates(change).slice(0, 3)).toEqual(['2026-10-10', '2026-11-10', '2027-01-10'])
+  })
+
+  it('mudando a data a agenda é nova: gera todas as datas, inclusive no mês excluído', () => {
+    const change = changeFollowing(CURRENT, occurrence('out'), { ...FIELDS, date: '2026-10-11', status: 'pending' }, SKIPPED_CTX)
+    expect(dates(change).slice(0, 4)).toEqual(['2026-10-11', '2026-11-11', '2026-12-11', '2027-01-11'])
   })
 })
 
@@ -127,8 +170,8 @@ describe('changeSeries', () => {
     expect(change.series.startDate).toBe('2026-09-10')
     expect(change.series.amountCents).toBe(210_000)
     expect(change.deleteIds).toEqual(['out', 'nov'])
-    expect(dates(change)).toHaveLength(12)
-    expect(dates(change)[0]).toBe('2026-10-10')
+    expect(dates(change)).toHaveLength(11)
+    expect(dates(change).slice(0, 3)).toEqual(['2026-10-10', '2026-11-10', '2027-01-10'])
   })
 
   it('mudando a frequência: a próxima data vira a âncora', () => {
@@ -140,8 +183,60 @@ describe('changeSeries', () => {
 
   it('só a data final: gera até ela', () => {
     const change = changeSeries(CURRENT, { ...FIELDS, frequency: 'monthly', nextDate: '2026-10-10', endDate: '2026-12-31' }, CTX)
-    expect(dates(change)).toEqual(['2026-10-10', '2026-11-10', '2026-12-10'])
+    expect(dates(change)).toEqual(['2026-10-10', '2026-11-10'])
     expect(change.generatedUntil).toBe('2026-12-31')
+  })
+
+  it('não traz de volta a ocorrência excluída com "Só este"', () => {
+    const change = changeSeries(CURRENT, { ...FIELDS, amountCents: 210_000, frequency: 'monthly', nextDate: '2026-10-10', endDate: null }, SKIPPED_CTX)
+    expect(dates(change)).not.toContain('2026-12-10')
+    expect(dates(change).slice(0, 3)).toEqual(['2026-10-10', '2026-11-10', '2027-01-10'])
+  })
+
+  it('mudando a frequência a agenda é nova: gera todas as datas, inclusive no mês excluído', () => {
+    // Quinta 08/10 + 9 semanas = quinta 10/12
+    const change = changeSeries(CURRENT, { ...FIELDS, frequency: 'weekly', nextDate: '2026-10-08', endDate: '2026-12-31' }, SKIPPED_CTX)
+    expect(dates(change)).toContain('2026-12-10')
+  })
+
+  it('pendente antes da âncora (próxima movida em "este e os próximos") é regravada no lugar com os valores novos', () => {
+    const change = changeSeries(MOVED, { ...FIELDS, amountCents: 210_000, frequency: 'monthly', nextDate: '2026-10-10', endDate: null }, MOVED_CTX)
+    expect(change.series).toMatchObject({ startDate: '2026-11-15', endDate: null, amountCents: 210_000 })
+    expect(change.deleteIds).toEqual(['out', 'nov', 'dez'])
+    expect(change.occurrences[0]).toEqual({ id: 'out', date: '2026-10-10', occurrenceDate: '2026-10-10', status: 'pending', cycle: null })
+    expect(change.occurrences.slice(1).every((item) => item.id === undefined)).toBe(true)
+    expect(dates(change)).toHaveLength(12)
+    expect(dates(change).slice(0, 4)).toEqual(['2026-10-10', '2026-11-15', '2026-12-15', '2027-01-15'])
+  })
+
+  it('pendente antes da âncora no cartão: a fatura é recalculada pela data', () => {
+    const card = { schedule: { closingDay: 3, dueDay: 10 }, stored: [] }
+    const onCard = (item: SeriesTransaction): SeriesTransaction => ({ ...item, accountId: null })
+    const change = changeSeries(
+      { ...MOVED, accountId: null, creditCardId: 'card' },
+      { ...FIELDS, accountId: null, creditCardId: 'card', amountCents: 210_000, frequency: 'monthly', nextDate: '2026-10-10', endDate: null },
+      { transactions: MOVED_TRANSACTIONS.map(onCard), today: TODAY, card },
+    )
+    expect(change.deleteIds).toEqual(['out', 'nov', 'dez'])
+    expect(change.occurrences[0]).toMatchObject({
+      id: 'out',
+      date: '2026-10-10',
+      occurrenceDate: '2026-10-10',
+      status: 'pending',
+      cycle: { closingMonth: '2026-11-01' },
+    })
+  })
+
+  it('pendente antes da âncora sai só se ficar depois da data final', () => {
+    const change = changeSeries(MOVED, { ...FIELDS, frequency: 'monthly', nextDate: '2026-10-10', endDate: '2026-11-30' }, MOVED_CTX)
+    expect(change.deleteIds).toEqual(['out', 'nov', 'dez'])
+    expect(dates(change)).toEqual(['2026-10-10', '2026-11-15'])
+    expect(change.occurrences[0].id).toBe('out')
+  })
+
+  it('data final antes da âncora: detectável para a action recusar (o RPC apagaria a série)', () => {
+    const change = changeSeries(MOVED, { ...FIELDS, frequency: 'monthly', nextDate: '2026-10-10', endDate: '2026-10-31' }, MOVED_CTX)
+    expect(change.series.endDate! < change.series.startDate).toBe(true)
   })
 })
 

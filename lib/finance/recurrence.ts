@@ -179,12 +179,42 @@ function fieldsOf(values: SeriesFields): SeriesFields {
 }
 
 const earlier = (a: string, b: string) => (a < b ? a : b)
+const later = (a: string, b: string) => (a > b ? a : b)
 
-/** Ocorrências de `from` até onde a série deve estar gerada. */
-function regenerate(series: Series, from: string, ctx: ChangeContext): { occurrences: Occurrence[]; generatedUntil: string } {
+const withinEnd = (series: Pick<Series, 'endDate'>, date: string) => series.endDate === null || date <= series.endDate
+
+type Regenerated = { occurrences: Occurrence[]; generatedUntil: string }
+
+/** Agenda nova (âncora ou frequência mudou): todas as datas de `from` até onde a série deve estar gerada. */
+function regenerate(series: Series, from: string, ctx: ChangeContext): Regenerated {
   const generatedUntil = untilFor(series.endDate, ctx.today)
   const dates = from <= generatedUntil ? occurrenceDates(series, from, generatedUntil) : []
   return { occurrences: buildOccurrences(dates, ctx.card, ctx.today), generatedUntil }
+}
+
+/**
+ * Mesma agenda: volta só o que existia e foi substituído (`replaced`) e o que ainda não tinha sido gerado
+ * (depois de `previousUntil`). Data já gerada sem linha foi excluída de propósito ("Só este") e não volta.
+ */
+function regenerateKeepingSkips(
+  series: Series,
+  from: string,
+  replaced: SeriesTransaction[],
+  previousUntil: string,
+  ctx: ChangeContext,
+): Regenerated {
+  const generatedUntil = untilFor(series.endDate, ctx.today)
+  const replacedDates = replaced.map((tx) => tx.occurrenceDate).filter((date) => withinEnd(series, date))
+  const newFrom = later(from, addDaysISO(previousUntil, 1))
+  const newDates = newFrom <= generatedUntil ? occurrenceDates(series, newFrom, generatedUntil) : []
+  const dates = [...new Set([...replacedDates, ...newDates])].sort()
+  return { occurrences: buildOccurrences(dates, ctx.card, ctx.today), generatedUntil }
+}
+
+/** Regrava uma linha existente no lugar (mesmo id e datas) com os valores novos; no cartão a fatura é recalculada. */
+function rewriteInPlace(tx: SeriesTransaction, ctx: ChangeContext): Occurrence {
+  const [built] = buildOccurrences([tx.date], ctx.card, ctx.today)
+  return { ...built, id: tx.id, occurrenceDate: tx.occurrenceDate, status: ctx.card ? built.status : tx.status }
 }
 
 /** Série nova: a primeira ocorrência é o lançamento salvo no formulário. */
@@ -216,11 +246,15 @@ export function changeFollowing(
   const occurrenceDate = anchorChanged ? values.date : occurrence.occurrenceDate
 
   const others = ctx.transactions.filter((tx) => tx.id !== occurrence.id)
-  const deleteIds = [occurrence.id, ...occurrencesToReplace(others, addDaysISO(occurrence.occurrenceDate, 1), ctx.today)]
+  const replacedIds = occurrencesToReplace(others, addDaysISO(occurrence.occurrenceDate, 1), ctx.today)
+  const deleteIds = [occurrence.id, ...replacedIds]
 
   const [rewritten] = buildOccurrences([values.date], ctx.card, ctx.today)
   const self: Occurrence = { ...rewritten, id: occurrence.id, occurrenceDate, status: ctx.card ? rewritten.status : values.status }
-  const rest = regenerate(series, addDaysISO(occurrenceDate, 1), ctx)
+  const from = addDaysISO(occurrenceDate, 1)
+  const rest = anchorChanged
+    ? regenerate(series, from, ctx)
+    : regenerateKeepingSkips(series, from, others.filter((tx) => replacedIds.includes(tx.id)), current.generatedUntil, ctx)
   return { series, deleteIds, occurrences: [self, ...rest.occurrences], generatedUntil: rest.generatedUntil }
 }
 
@@ -236,7 +270,12 @@ export function removeFollowing(current: SeriesState, occurrence: SeriesTransact
   }
 }
 
-/** Edição pela tela Recorrências: troca as não realizadas de hoje em diante. */
+/**
+ * Edição pela tela Recorrências: troca as não realizadas de hoje em diante.
+ * Sem mudar a agenda, a pendente que ficou antes da âncora (próxima movida em "este e os próximos") é regravada
+ * no lugar; com agenda nova, a próxima data escolhida manda e as anteriores a ela saem.
+ * Data final antes do início deixa `series.endDate < series.startDate`: quem chama precisa recusar.
+ */
 export function changeSeries(current: SeriesState, values: SeriesEditValues, ctx: ChangeContext): SeriesChange {
   const anchorChanged = values.frequency !== current.frequency || values.nextDate !== nextOccurrenceDate(ctx.transactions, ctx.today)
   const series: Series = {
@@ -246,7 +285,14 @@ export function changeSeries(current: SeriesState, values: SeriesEditValues, ctx
     endDate: values.endDate,
   }
   const deleteIds = occurrencesToReplace(ctx.transactions, ctx.today, ctx.today)
-  return { series, deleteIds, ...regenerate(series, ctx.today, ctx) }
+  if (anchorChanged) return { series, deleteIds, ...regenerate(series, ctx.today, ctx) }
+
+  const replaced = ctx.transactions.filter((tx) => deleteIds.includes(tx.id))
+  const beforeStart = replaced.filter((tx) => tx.occurrenceDate < series.startDate)
+  const rewritten = beforeStart.filter((tx) => withinEnd(series, tx.occurrenceDate)).map((tx) => rewriteInPlace(tx, ctx))
+  const fromStart = replaced.filter((tx) => tx.occurrenceDate >= series.startDate)
+  const rest = regenerateKeepingSkips(series, ctx.today, fromStart, current.generatedUntil, ctx)
+  return { series, deleteIds, occurrences: [...rewritten, ...rest.occurrences], generatedUntil: rest.generatedUntil }
 }
 
 /** Encerrar: a série termina hoje e as não realizadas depois de hoje saem. */
