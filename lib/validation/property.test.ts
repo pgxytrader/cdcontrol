@@ -78,6 +78,43 @@ describe('planSchema', () => {
   })
 })
 
+describe('datas fora de 2000–2100', () => {
+  const MSG = 'Use uma data entre 2000 e 2100.'
+  const plan = { propertyId: UUID, fundingSource: 'own', monthly: null, intermediate: null, keys: null }
+  it('expenseSchema recusa vencimento em 2206', () => {
+    const result = expenseSchema.safeParse({
+      propertyId: UUID,
+      expenseTypeId: UUID2,
+      description: 'X',
+      plannedAmountCents: 1,
+      dueDate: '2206-03-10',
+      fundingSource: 'own',
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.find((i) => i.path[0] === 'dueDate')?.message).toBe(MSG)
+  })
+  it('planSchema recusa chaves em 2101', () => {
+    const result = planSchema.safeParse({ ...plan, keys: { amountCents: 1, dueDate: '2101-01-10' } })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.some((i) => i.path.join('.') === 'keys.dueDate' && i.message === MSG)).toBe(true)
+  })
+  it('planSchema recusa mensais cuja última parcela passa de 2100', () => {
+    const result = planSchema.safeParse({ ...plan, monthly: { amountCents: 1, count: 360, firstDueDate: '2080-01-10' } })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.some((i) => i.path.join('.') === 'monthly.firstDueDate' && i.message === MSG)).toBe(true)
+  })
+  it('planSchema recusa intermediárias cuja última passa de 2100', () => {
+    const result = planSchema.safeParse({ ...plan, intermediate: { amountCents: 1, count: 60, firstDueDate: '2050-01-10', everyMonths: 12 } })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues.some((i) => i.path.join('.') === 'intermediate.firstDueDate')).toBe(true)
+  })
+  it('plano normal passa', () => {
+    expect(
+      planSchema.safeParse({ ...plan, monthly: { amountCents: 1, count: 360, firstDueDate: '2026-11-10' }, keys: { amountCents: 1, dueDate: '2100-12-31' } }).success,
+    ).toBe(true)
+  })
+})
+
 describe('expenseTypeSchema', () => {
   it('nome 1–60 e fase típica válida', () => {
     expect(expenseTypeSchema.safeParse({ name: 'Móveis', typicalPhase: 'post_keys' }).success).toBe(true)

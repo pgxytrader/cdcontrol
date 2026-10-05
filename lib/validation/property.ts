@@ -9,6 +9,7 @@ import {
   type PropertyExpense,
   type PropertyPhase,
 } from '@/lib/finance/property'
+import { addMonthsClamped } from '@/lib/finance/invoice'
 import { isoDateSchema, uuidSchema } from './common'
 import { MAX_CENTS, descriptionSchema, notesSchema } from './fields'
 import { transactionRecordSchema } from './transaction-record'
@@ -71,13 +72,18 @@ export const propertySchema = z.object({
 export type PropertyInput = z.input<typeof propertySchema>
 export type PropertyOutput = z.output<typeof propertySchema>
 
+const DATE_RANGE_ERROR = 'Use uma data entre 2000 e 2100.'
+
+/** Data de calendário válida com ano entre 2000 e 2100 (a tela e os cálculos de mês assumem esse intervalo). */
+const boundedDateSchema = isoDateSchema.refine((value) => value >= '2000-01-01' && value <= '2100-12-31', { error: DATE_RANGE_ERROR })
+
 export const expenseSchema = z.object({
   propertyId: uuidSchema,
   expenseTypeId: z.uuid({ error: 'Escolha o tipo.' }),
   description: descriptionSchema,
   payee: optionalText(80),
   plannedAmountCents: centsSchema,
-  dueDate: isoDateSchema,
+  dueDate: boundedDateSchema,
   fundingSource: z.enum(FUNDING_SOURCES, { error: 'Escolha a fonte.' }),
   notes: notesSchema,
 })
@@ -125,20 +131,27 @@ export const planSchema = z
   .object({
     propertyId: uuidSchema,
     fundingSource: z.enum(FUNDING_SOURCES, { error: 'Escolha a fonte.' }),
-    monthly: z.object({ amountCents: positiveCents, count: blockCount(360), firstDueDate: isoDateSchema }).nullable(),
+    monthly: z.object({ amountCents: positiveCents, count: blockCount(360), firstDueDate: boundedDateSchema }).nullable(),
     intermediate: z
       .object({
         amountCents: positiveCents,
         count: blockCount(60),
-        firstDueDate: isoDateSchema,
+        firstDueDate: boundedDateSchema,
         everyMonths: z.union([z.literal(6), z.literal(12)], { error: 'A cada 6 ou 12 meses.' }),
       })
       .nullable(),
-    keys: z.object({ amountCents: positiveCents, dueDate: isoDateSchema }).nullable(),
+    keys: z.object({ amountCents: positiveCents, dueDate: boundedDateSchema }).nullable(),
   })
   .refine((value) => value.monthly || value.intermediate || value.keys, {
     error: 'Preencha ao menos um bloco: mensais, intermediárias ou chaves.',
     path: ['monthly'],
+  })
+  .superRefine((value, ctx) => {
+    const { monthly, intermediate } = value
+    if (monthly && addMonthsClamped(monthly.firstDueDate, monthly.count - 1) > '2100-12-31')
+      ctx.addIssue({ code: 'custom', path: ['monthly', 'firstDueDate'], message: DATE_RANGE_ERROR })
+    if (intermediate && addMonthsClamped(intermediate.firstDueDate, (intermediate.count - 1) * intermediate.everyMonths) > '2100-12-31')
+      ctx.addIssue({ code: 'custom', path: ['intermediate', 'firstDueDate'], message: DATE_RANGE_ERROR })
   })
 
 export type PlanInput = z.input<typeof planSchema>

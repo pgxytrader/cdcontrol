@@ -1,6 +1,5 @@
 // lib/property-filters.ts
 import { formatYearMonthParam, parseYearMonth, type YearMonth } from '@/lib/dates'
-import { monthIndex } from '@/lib/finance/periods'
 import { expenseStatus, type ExpenseStatus, type FundingSource, type PropertyExpense } from '@/lib/finance/property'
 import { uuidSchema } from '@/lib/validation/common'
 
@@ -72,13 +71,13 @@ export function hasExpenseFilters(filters: ExpenseFilters): boolean {
 
 /** Filtra pelo tipo, status (com "atrasado" calculado), fonte e mês de vencimento (de/até, inclusivos). */
 export function filterExpenses<T extends PropertyExpense>(expenses: T[], filters: ExpenseFilters, today: string): T[] {
-  const from = filters.from ? monthIndex(filters.from) : null
-  const to = filters.to ? monthIndex(filters.to) : null
+  const from = filters.from ? formatYearMonthParam(filters.from) : null
+  const to = filters.to ? formatYearMonthParam(filters.to) : null
   return expenses.filter((expense) => {
     if (filters.typeId && expense.expenseTypeId !== filters.typeId) return false
     if (filters.status && expenseStatus(expense, today) !== filters.status) return false
     if (filters.source && expense.fundingSource !== filters.source) return false
-    const due = monthIndex(parseYearMonth(expense.dueDate.slice(0, 7)) as YearMonth)
+    const due = expense.dueDate.slice(0, 7)
     if (from !== null && due < from) return false
     if (to !== null && due > to) return false
     return true

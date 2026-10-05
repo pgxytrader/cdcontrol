@@ -59,6 +59,12 @@ describe('filterExpenses', () => {
     expect(filterExpenses(list, { from: { year: 2026, month: 10 }, to: { year: 2026, month: 12 } }, today).map((e) => e.id)).toEqual(['paid'])
     expect(filterExpenses(list, {}, today)).toHaveLength(3)
   })
+  it('data fora de 2000–2100 não derruba o filtro (compara AAAA-MM)', () => {
+    const far = [expense({ id: 'far', dueDate: '2206-03-10' }), expense({ id: 'near', dueDate: '2026-11-10' })]
+    expect(filterExpenses(far, {}, '2026-10-05').map((e) => e.id)).toEqual(['far', 'near'])
+    expect(filterExpenses(far, { from: { year: 2026, month: 1 }, to: { year: 2026, month: 12 } }, '2026-10-05').map((e) => e.id)).toEqual(['near'])
+    expect(filterExpenses(far, { from: { year: 2206, month: 3 } }, '2026-10-05').map((e) => e.id)).toEqual(['far'])
+  })
   it('hasExpenseFilters', () => {
     expect(hasExpenseFilters({})).toBe(false)
     expect(hasExpenseFilters({ source: 'own' })).toBe(true)
