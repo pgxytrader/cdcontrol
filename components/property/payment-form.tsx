@@ -21,10 +21,7 @@ type PaymentFormProps = { expense: ExpenseView; systemKey: string | null; today:
 
 export function PaymentForm({ expense, systemKey, today, onDone }: PaymentFormProps) {
   const data = useTransactionFormData()
-  const accounts = data.accounts.filter((account) => !account.archived)
-  const cards = data.cards.filter((card) => !card.archived)
   const expenseCategories = activeCategories(data.categories).filter((category) => category.kind === 'expense')
-  const tree = buildCategoryTree(expenseCategories)
   const imovel = expenseCategories.find((category) => category.isDefault && category.parentId === null && category.name === 'Imóvel')
 
   const [paidCents, setPaidCents] = useState(expense.paidAmountCents ?? expense.plannedAmountCents)
@@ -34,9 +31,19 @@ export function PaymentForm({ expense, systemKey, today, onDone }: PaymentFormPr
   const [source, setSource] = useState(
     expense.linked
       ? encodeSource({ accountId: expense.linked.accountId ?? '', creditCardId: expense.linked.creditCardId ?? '' })
-      : encodeSource(pickDefaultSource(accounts, cards, data.lastAccountId, data.lastCreditCardId)),
+      : encodeSource(pickDefaultSource(
+          data.accounts.filter((account) => !account.archived),
+          data.cards.filter((card) => !card.archived), data.lastAccountId, data.lastCreditCardId)),
   )
   const [categoryId, setCategoryId] = useState(expense.linked?.categoryId ?? imovel?.id ?? expenseCategories[0]?.id ?? '')
+  const selected = decodeSource(source)
+  // Mantém o item atual na lista mesmo se arquivado (como no formulário de lançamento)
+  const accounts = data.accounts.filter((account) => !account.archived || account.id === selected.accountId)
+  const cards = data.cards.filter((card) => !card.archived || card.id === selected.creditCardId)
+  const currentCategory = expenseCategories.some((category) => category.id === categoryId)
+    ? undefined
+    : data.categories.find((category) => category.id === categoryId && category.kind === 'expense')
+  const tree = buildCategoryTree(currentCategory ? [...expenseCategories, currentCategory] : expenseCategories)
   const [errors, setErrors] = useState<Errors>({})
   const [pending, startTransition] = useTransition()
   const err = (field: string) => errors[field]?.[0]
@@ -87,7 +94,11 @@ export function PaymentForm({ expense, systemKey, today, onDone }: PaymentFormPr
         </p>
       ) : null}
       <Field id="payment-source-kind" label="Fonte do recurso" error={err('fundingSource')}>
-        <NativeSelect id="payment-source-kind" value={fundingSource} onChange={(e) => setFundingSource(e.target.value as FundingSource)}>
+        <NativeSelect id="payment-source-kind" value={fundingSource} onChange={(e) => {
+            const next = e.target.value as FundingSource
+            setFundingSource(next)
+            if (next === 'own') setLaunch(true)
+          }}>
           {FUNDING_SOURCES.map((value) => (
             <option key={value} value={value}>
               {FUNDING_LABELS[value]}
@@ -111,7 +122,7 @@ export function PaymentForm({ expense, systemKey, today, onDone }: PaymentFormPr
                     <optgroup label="Contas">
                       {accounts.map((account) => (
                         <option key={account.id} value={encodeSource({ accountId: account.id, creditCardId: '' })}>
-                          {account.name}
+                          {account.archived ? `${account.name} (arquivada)` : account.name}
                         </option>
                       ))}
                     </optgroup>
@@ -120,7 +131,7 @@ export function PaymentForm({ expense, systemKey, today, onDone }: PaymentFormPr
                     <optgroup label="Cartões">
                       {cards.map((card) => (
                         <option key={card.id} value={encodeSource({ accountId: '', creditCardId: card.id })}>
-                          {card.name}
+                          {card.archived ? `${card.name} (arquivado)` : card.name}
                         </option>
                       ))}
                     </optgroup>
@@ -131,11 +142,11 @@ export function PaymentForm({ expense, systemKey, today, onDone }: PaymentFormPr
                 <NativeSelect id="payment-category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-invalid={Boolean(err('categoryId'))}>
                   {tree.flatMap((node) => [
                     <option key={node.id} value={node.id}>
-                      {node.name}
+                      {expenseCategories.some((c) => c.id === node.id) ? node.name : `${node.name} (arquivada)`}
                     </option>,
                     ...node.children.map((child) => (
                       <option key={child.id} value={child.id}>
-                        {`— ${child.name}`}
+                        {`— ${child.name}${expenseCategories.some((c) => c.id === child.id) ? '' : ' (arquivada)'}`}
                       </option>
                     )),
                   ])}

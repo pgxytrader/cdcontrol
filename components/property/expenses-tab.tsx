@@ -187,6 +187,9 @@ export function ExpensesTab({ propertyId, expenses, types, query, today, openExp
                           <span className="font-medium tabular-nums">
                             {formatBRL(expense.status === 'paid' ? (expense.paidAmountCents ?? 0) : expense.plannedAmountCents)}
                           </span>
+                          {expense.status === 'paid' && expense.paidAmountCents !== null && expense.paidAmountCents !== expense.plannedAmountCents ? (
+                            <span className="text-xs text-muted-foreground tabular-nums">previsto {formatBRL(expense.plannedAmountCents)}</span>
+                          ) : null}
                           <span className="flex items-center gap-1">
                             {correction !== 0 ? <span className="text-xs text-muted-foreground tabular-nums">INCC {formatSignedBRL(correction)}</span> : null}
                             <ExpenseStatusBadge status={status} />
