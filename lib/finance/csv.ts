@@ -67,5 +67,5 @@ export function transactionsCsv(rows: TransactionRow[], lookups: CsvLookups): st
       csvAmount(row.amount_cents, row.type),
     ].join(';'),
   )
-  return `﻿${[HEADER.join(';'), ...lines].join('\r\n')}\r\n`
+  return `\uFEFF${[HEADER.join(';'), ...lines].join('\r\n')}\r\n`
 }

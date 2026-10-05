@@ -38,7 +38,7 @@ const lookups = {
   cards: [{ id: 'nubank', name: 'Nubank' }],
 }
 
-const lines = (csv: string) => csv.replace(/^﻿/, '').split('\r\n').filter(Boolean)
+const lines = (csv: string) => csv.replace(/^\uFEFF/, '').split('\r\n').filter(Boolean)
 
 describe('csvText', () => {
   it('aspas quando há ; " ou quebra de linha, com " duplicada', () => {
@@ -68,7 +68,7 @@ describe('csvAmount', () => {
 describe('transactionsCsv', () => {
   it('BOM, cabeçalho e uma despesa em conta', () => {
     const csv = transactionsCsv([base], lookups)
-    expect(csv.startsWith('﻿')).toBe(true)
+    expect(csv.startsWith('\uFEFF')).toBe(true)
     expect(csv.endsWith('\r\n')).toBe(true)
     expect(lines(csv)[0]).toBe('Data;Descrição;Tipo;Categoria;Conta/Cartão;Status;Valor')
     expect(lines(csv)[1]).toBe('05/10/2026;Mercado;Despesa;Mercado;Itaú;Pago;-1234,56')
@@ -107,6 +107,6 @@ describe('transactionsCsv', () => {
     )
   })
   it('sem linhas, só o cabeçalho', () => {
-    expect(transactionsCsv([], lookups)).toBe('﻿Data;Descrição;Tipo;Categoria;Conta/Cartão;Status;Valor\r\n')
+    expect(transactionsCsv([], lookups)).toBe('\uFEFFData;Descrição;Tipo;Categoria;Conta/Cartão;Status;Valor\r\n')
   })
 })
