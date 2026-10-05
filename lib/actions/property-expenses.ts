@@ -206,6 +206,17 @@ export async function deleteExpenses(ids: unknown): Promise<ActionResult<Propert
   return { ok: true, data: { expenses: expenses as ExpenseRecord[], transactions } }
 }
 
+/** Exclui gastos recém-gerados pelo plano (previstos, sem lançamento ligado): sem leitura prévia, só o RPC (POST). */
+export async function deletePlanExpenses(ids: unknown): Promise<ActionResult> {
+  const parsed = idsSchema.safeParse(ids)
+  if (!parsed.success) return { ok: false, error: GENERIC_ERROR }
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('delete_property_expenses', { p_ids: parsed.data })
+  if (error) return { ok: false, error: translateError(error) }
+  done()
+  return { ok: true, data: null }
+}
+
 export async function restoreExpenses(snapshot: unknown): Promise<ActionResult> {
   const parsed = propertySnapshotSchema.safeParse(snapshot)
   if (!parsed.success) return { ok: false, error: GENERIC_ERROR }

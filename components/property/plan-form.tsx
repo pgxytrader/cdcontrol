@@ -8,7 +8,7 @@ import { NativeSelect } from '@/components/form/native-select'
 import { ResponsiveModal } from '@/components/layout/responsive-modal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { deleteExpenses, generatePlan } from '@/lib/actions/property-expenses'
+import { deletePlanExpenses, generatePlan } from '@/lib/actions/property-expenses'
 import { formatISODateBR } from '@/lib/dates'
 import { formatBRL } from '@/lib/finance/money'
 import { FUNDING_LABELS, FUNDING_SOURCES, type FundingSource } from '@/lib/finance/property'
@@ -75,7 +75,7 @@ function PlanForm({ propertyId, today, onDone }: { propertyId: string; today: st
         action: {
           label: 'Desfazer',
           onClick: async () => {
-            const undone = await deleteExpenses(ids)
+            const undone = await deletePlanExpenses(ids)
             if (undone.ok) toast.success('Plano desfeito.')
             else toast.error(undone.error)
           },
