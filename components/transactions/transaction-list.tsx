@@ -6,6 +6,7 @@ import type { Category } from '@/lib/categories'
 import { invoiceHref } from '@/lib/invoice-labels'
 import { groupByDay, groupByMonth, splitPending, type TransactionGroup } from '@/lib/transaction-grouping'
 import { installmentInfo, rowToFormValues, seriesInfo, type TransactionRow } from '@/lib/transaction-mappers'
+import { PropertyTransactionModal } from './property-transaction-modal'
 import { TransactionItem } from './transaction-item'
 import { TransactionModal } from './transaction-modal'
 
@@ -32,6 +33,7 @@ function buildSections(rows: TransactionRow[], mode: 'month' | 'search'): Sectio
 export function TransactionList({ rows, categories, accounts, cards, mode }: TransactionListProps) {
   const router = useRouter()
   const [editing, setEditing] = useState<TransactionRow | null>(null)
+  const [viewing, setViewing] = useState<TransactionRow | null>(null)
   const categoryById = new Map(categories.map((category) => [category.id, category]))
   const accountName = new Map(accounts.map((account) => [account.id, account.name]))
   const cardName = new Map(cards.map((card) => [card.id, card.name]))
@@ -54,6 +56,10 @@ export function TransactionList({ rows, categories, accounts, cards, mode }: Tra
 
   // Pagamento de fatura se edita na tela da fatura
   const open = (row: TransactionRow) => {
+    if (row.source === 'property') {
+      setViewing(row)
+      return
+    }
     if (row.type === 'invoice_payment' && row.credit_card_id && row.card_invoices) {
       router.push(invoiceHref(row.credit_card_id, row.card_invoices.closing_month))
       return
@@ -96,6 +102,12 @@ export function TransactionList({ rows, categories, accounts, cards, mode }: Tra
         initial={editing ? rowToFormValues(editing) : undefined}
         installment={editing ? installmentInfo(editing) : undefined}
         series={editing ? seriesInfo(editing) : undefined}
+      />
+      <PropertyTransactionModal
+        row={viewing}
+        sourceLabel={viewing ? labelFor(viewing) : ''}
+        categoryName={viewing?.category_id ? categoryById.get(viewing.category_id)?.name : undefined}
+        onClose={() => setViewing(null)}
       />
     </>
   )

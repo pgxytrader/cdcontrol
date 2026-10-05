@@ -1,4 +1,4 @@
-import { ArrowLeftRight, CreditCard, Repeat } from 'lucide-react'
+import { ArrowLeftRight, Building2, CreditCard, Repeat } from 'lucide-react'
 import { CategoryIcon } from '@/components/categories/category-icon'
 import type { Category } from '@/lib/categories'
 import { installmentLabel } from '@/lib/finance/installments'
@@ -20,7 +20,7 @@ export function TransactionItem({ row, category, sourceLabel, onClick }: Transac
   const neutral = row.type === 'transfer' || isPayment
   const amount = neutral ? formatBRL(row.amount_cents) : formatSignedBRL(row.type === 'income' ? row.amount_cents : -row.amount_cents)
   const title = installmentLabel(row.description, row.installment_number, row.installment_plans?.installments_count ?? null)
-  const subtitle = [neutral ? null : category?.name, sourceLabel, row.status === 'pending' ? 'previsto' : null]
+  const subtitle = [neutral ? null : category?.name, sourceLabel, row.source === 'property' ? 'Imóvel' : null, row.status === 'pending' ? 'previsto' : null]
     .filter(Boolean)
     .join(' · ')
   const NeutralIcon = isPayment ? CreditCard : ArrowLeftRight
@@ -41,6 +41,12 @@ export function TransactionItem({ row, category, sourceLabel, onClick }: Transac
             <>
               <Repeat className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
               <span className="sr-only">(recorrente)</span>
+            </>
+          ) : null}
+          {row.source === 'property' ? (
+            <>
+              <Building2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="sr-only">(imóvel)</span>
             </>
           ) : null}
         </span>

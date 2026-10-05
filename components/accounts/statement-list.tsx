@@ -1,4 +1,4 @@
-import { ArrowLeftRight, CreditCard, Repeat } from 'lucide-react'
+import { ArrowLeftRight, Building2, CreditCard, Repeat } from 'lucide-react'
 import { CategoryIcon } from '@/components/categories/category-icon'
 import type { Category } from '@/lib/categories'
 import { formatISODateBR } from '@/lib/dates'
@@ -52,6 +52,7 @@ export function StatementList({ statement, categories, accountNames, initialBala
                 : isPayment
                   ? null
                   : category?.name,
+              row.source === 'property' ? 'Imóvel' : null,
               note,
             ]
               .filter(Boolean)
@@ -72,6 +73,12 @@ export function StatementList({ statement, categories, accountNames, initialBala
                       <>
                         <Repeat className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
                         <span className="sr-only">(recorrente)</span>
+                      </>
+                    ) : null}
+                    {row.source === 'property' ? (
+                      <>
+                        <Building2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                        <span className="sr-only">(imóvel)</span>
                       </>
                     ) : null}
                   </p>

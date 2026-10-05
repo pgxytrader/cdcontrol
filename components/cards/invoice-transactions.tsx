@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { TransactionItem } from '@/components/transactions/transaction-item'
+import { PropertyTransactionModal } from '@/components/transactions/property-transaction-modal'
 import { TransactionModal } from '@/components/transactions/transaction-modal'
 import type { Category } from '@/lib/categories'
 import { formatISODateBR } from '@/lib/dates'
@@ -29,6 +30,7 @@ export function InvoiceTransactions({
 }: InvoiceTransactionsProps) {
   const [editing, setEditing] = useState<TransactionRow | null>(null)
   const [editingPayment, setEditingPayment] = useState<TransactionRow | null>(null)
+  const [viewing, setViewing] = useState<TransactionRow | null>(null)
   const categoryById = new Map(categories.map((category) => [category.id, category]))
   const accountName = new Map(accounts.map((account) => [account.id, account.name]))
 
@@ -48,7 +50,7 @@ export function InvoiceTransactions({
                   row={row}
                   category={row.category_id ? categoryById.get(row.category_id) : undefined}
                   sourceLabel={formatISODateBR(row.date)}
-                  onClick={() => setEditing(row)}
+                  onClick={() => (row.source === 'property' ? setViewing(row) : setEditing(row))}
                 />
               </li>
             ))}
@@ -82,6 +84,12 @@ export function InvoiceTransactions({
         initial={editing ? rowToFormValues(editing) : undefined}
         installment={editing ? installmentInfo(editing) : undefined}
         series={editing ? seriesInfo(editing) : undefined}
+      />
+      <PropertyTransactionModal
+        row={viewing}
+        sourceLabel="Cartão desta fatura"
+        categoryName={viewing?.category_id ? categoryById.get(viewing.category_id)?.name : undefined}
+        onClose={() => setViewing(null)}
       />
       {invoiceId ? (
         <PaymentModal

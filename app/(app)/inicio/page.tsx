@@ -10,9 +10,11 @@ import { InvoicesPanel } from '@/components/dashboard/invoices-panel'
 import { Panel } from '@/components/dashboard/panel'
 import { PageHeader } from '@/components/layout/page-header'
 import { MonthSummary, SummaryCard } from '@/components/transactions/month-summary'
+import { PropertyPanel } from '@/components/dashboard/property-panel'
 import { getDashboard } from '@/lib/dashboard'
 import { formatYearMonthParam, resolveYearMonth, todayISO } from '@/lib/dates'
 import { formatBRL } from '@/lib/finance/money'
+import { getPropertyCard } from '@/lib/property'
 
 export const metadata: Metadata = { title: 'Início' }
 
@@ -26,7 +28,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const { mes } = await searchParams
   const ym = resolveYearMonth(mes)
   const monthParam = formatYearMonthParam(ym)
-  const data = await getDashboard(ym, todayISO())
+  const today = todayISO()
+  const [data, propertyCard] = await Promise.all([getDashboard(ym, today), getPropertyCard(today)])
 
   return (
     <>
@@ -65,6 +68,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <Panel title="Orçamento" action={panelLink(`/orcamento?mes=${monthParam}`, 'Ver orçamento')}>
           <BudgetPanel lines={data.budgetLines} />
         </Panel>
+        {propertyCard ? (
+          <Panel title="Imóvel" action={panelLink(`/imovel?imovel=${propertyCard.propertyId}`, 'Ver imóvel')}>
+            <PropertyPanel card={propertyCard} />
+          </Panel>
+        ) : null}
       </div>
     </>
   )

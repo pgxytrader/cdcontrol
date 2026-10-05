@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { NativeSelect } from '@/components/form/native-select'
+import { PropertyTransactionModal } from '@/components/transactions/property-transaction-modal'
 import { TransactionModal } from '@/components/transactions/transaction-modal'
 import { formatYearMonthLabel, yearMonthOfISO } from '@/lib/dates'
 import type { InstallmentEntry, InstallmentMonth } from '@/lib/finance/installments-view'
@@ -21,6 +22,7 @@ type InstallmentsViewProps = {
 export function InstallmentsView({ months, totalCents, cards, cardId }: InstallmentsViewProps) {
   const router = useRouter()
   const [editing, setEditing] = useState<TransactionRow | null>(null)
+  const [viewing, setViewing] = useState<TransactionRow | null>(null)
   const cardById = new Map(cards.map((card) => [card.id, card]))
   const cardName = (id: string) => cardById.get(id)?.name ?? 'Cartão'
 
@@ -75,7 +77,7 @@ export function InstallmentsView({ months, totalCents, cards, cardId }: Installm
                   <li key={item.id}>
                     <button
                       type="button"
-                      onClick={() => setEditing(item.row)}
+                      onClick={() => (item.row.source === 'property' ? setViewing(item.row) : setEditing(item.row))}
                       className="flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-surface-2"
                     >
                       <span className="min-w-0 flex-1">
@@ -105,6 +107,12 @@ export function InstallmentsView({ months, totalCents, cards, cardId }: Installm
         transactionId={editing?.id}
         initial={editing ? rowToFormValues(editing) : undefined}
         installment={editing ? installmentInfo(editing) : undefined}
+      />
+      <PropertyTransactionModal
+        row={viewing}
+        sourceLabel={viewing?.credit_card_id ? cardName(viewing.credit_card_id) : ''}
+        categoryName={undefined}
+        onClose={() => setViewing(null)}
       />
     </>
   )

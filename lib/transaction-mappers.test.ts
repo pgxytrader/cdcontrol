@@ -35,6 +35,7 @@ const row: TransactionRow = {
   recurrence_id: null,
   occurrence_date: null,
   recurrences: null,
+  source: 'manual',
 }
 
 describe('mapeadores de lançamento', () => {

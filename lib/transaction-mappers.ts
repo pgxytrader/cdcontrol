@@ -4,7 +4,9 @@ import type { LedgerTransaction, TransactionStatus, TransactionType } from '@/li
 import type { TransactionFormValues, TransactionInput } from '@/lib/validation/transaction'
 
 export const TRANSACTION_COLUMNS =
-  'id, type, description, amount_cents, date, status, category_id, account_id, destination_account_id, credit_card_id, invoice_id, installment_plan_id, installment_number, notes, created_at, installment_plans(installments_count), card_invoices(closing_month), recurrence_id, occurrence_date, recurrences(frequency)'
+  'id, type, description, amount_cents, date, status, category_id, account_id, destination_account_id, credit_card_id, invoice_id, installment_plan_id, installment_number, notes, created_at, installment_plans(installments_count), card_invoices(closing_month), recurrence_id, occurrence_date, recurrences(frequency), source'
+
+export type TransactionSource = 'manual' | 'recurrence' | 'property' | 'import'
 
 export type TransactionRow = {
   id: string
@@ -28,6 +30,8 @@ export type TransactionRow = {
   recurrence_id: string | null
   occurrence_date: string | null
   recurrences: { frequency: RecurrenceFrequency } | null
+  /** De onde veio: 'property' é o lançamento ligado a um gasto do Imóvel (só leitura em Lançamentos). */
+  source: TransactionSource
 }
 
 export type TransactionInsertRow = {
