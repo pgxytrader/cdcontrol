@@ -62,6 +62,8 @@ describe('mapeadores de lançamento', () => {
       installmentsCount: 1,
       inProgress: false,
       currentInstallment: 1,
+      repeatFrequency: '',
+      repeatEndDate: '',
     })
   })
 
@@ -92,6 +94,7 @@ describe('mapeadores de lançamento', () => {
       status: 'paid',
       accountId: 'acc-1',
       notes: null,
+      repeat: null,
       destinationAccountId: 'acc-2',
     }
     expect(inputToRow(transfer, 'house-1')).toMatchObject({ category_id: null, destination_account_id: 'acc-2' })
@@ -104,6 +107,7 @@ describe('mapeadores de lançamento', () => {
       status: 'paid',
       accountId: 'acc-1',
       notes: null,
+      repeat: null,
       categoryId: 'cat-1',
     }
     expect(inputToRow(expense, 'house-1')).toEqual({

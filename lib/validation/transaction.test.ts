@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canRepeat,
   cardTransactionSchema,
   installmentEditSchema,
   isCardForm,
@@ -30,6 +31,8 @@ const form: TransactionFormValues = {
   installmentsCount: 1,
   inProgress: false,
   currentInstallment: 1,
+  repeatFrequency: '',
+  repeatEndDate: '',
 }
 
 const cardForm: TransactionFormValues = { ...form, accountId: '', creditCardId: CARD }
@@ -152,5 +155,57 @@ describe('installmentEditSchema', () => {
       notes: null,
     })
     expect(installmentEditSchema.safeParse({ scope: 'all', description: 'TV', categoryId: CAT }).success).toBe(false)
+  })
+})
+
+describe('repeat', () => {
+  it('sem repetir, repeat é nulo', () => {
+    expect(transactionSchema.parse(toTransactionInput(form)).repeat).toBeNull()
+  })
+
+  it('mensal sem data final', () => {
+    expect(transactionSchema.parse(toTransactionInput({ ...form, repeatFrequency: 'monthly' })).repeat).toEqual({
+      frequency: 'monthly',
+      endDate: null,
+    })
+  })
+
+  it('data final antes do lançamento é recusada no campo "Até"', () => {
+    const result = transactionSchema.safeParse(toTransactionInput({ ...form, repeatFrequency: 'weekly', repeatEndDate: '2026-10-01' }))
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].path).toEqual(['repeatEndDate'])
+  })
+
+  it('transferência pode repetir', () => {
+    const parsed = transactionSchema.parse(toTransactionInput({ ...form, type: 'transfer', destinationAccountId: ACC_2, repeatFrequency: 'monthly' }))
+    expect(parsed.repeat?.frequency).toBe('monthly')
+  })
+
+  it('no cartão só a compra à vista repete; o conversor descarta o resto', () => {
+    expect(cardTransactionSchema.parse(toCardTransactionInput({ ...cardForm, repeatFrequency: 'monthly' })).repeat).toEqual({
+      frequency: 'monthly',
+      endDate: null,
+    })
+    expect(cardTransactionSchema.parse(toCardTransactionInput({ ...cardForm, repeatFrequency: 'monthly', amountCents: 9_000, installmentsCount: 3 })).repeat).toBeNull()
+    expect(cardTransactionSchema.parse(toCardTransactionInput({ ...cardForm, type: 'income', repeatFrequency: 'monthly' })).repeat).toBeNull()
+    expect(canRepeat({ ...cardForm, installmentsCount: 3 })).toBe(false)
+    expect(canRepeat({ ...cardForm, inProgress: true })).toBe(false)
+    expect(canRepeat({ ...form, type: 'transfer' })).toBe(true)
+  })
+
+  it('o servidor recusa parcelada ou estorno com repetição', () => {
+    const base = {
+      type: 'expense',
+      description: 'TV',
+      amountCents: 9_000,
+      date: '2026-10-04',
+      categoryId: CAT,
+      creditCardId: CARD,
+      installmentsCount: 3,
+      currentInstallment: null,
+      repeat: { frequency: 'monthly', endDate: null },
+    }
+    expect(cardTransactionSchema.safeParse(base).error?.issues[0].path).toEqual(['repeatFrequency'])
+    expect(cardTransactionSchema.safeParse({ ...base, type: 'income', installmentsCount: 1 }).success).toBe(false)
   })
 })

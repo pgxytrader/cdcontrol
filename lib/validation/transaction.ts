@@ -2,31 +2,15 @@ import type { FieldErrors, Resolver } from 'react-hook-form'
 import { z } from 'zod'
 import { MAX_INSTALLMENTS, type CardPurchaseInput } from '@/lib/finance/installments'
 import type { TransactionStatus, TransactionType } from '@/lib/finance/types'
+import type { RecurrenceFrequency } from '@/lib/finance/recurrence'
 import { isoDateSchema } from './common'
-
-const MAX_CENTS = 99_999_999_999
-
-const description = z
-  .string()
-  .trim()
-  .min(1, { error: 'Informe a descrição.' })
-  .max(120, { error: 'Use no máximo 120 caracteres.' })
-
-const amountCents = z
-  .number({ error: 'Informe o valor.' })
-  .int({ error: 'Informe o valor.' })
-  .positive({ error: 'Informe um valor maior que zero.' })
-  .max(MAX_CENTS, { error: 'Valor muito alto.' })
-
-const notes = z
-  .string()
-  .trim()
-  .max(500, { error: 'Use no máximo 500 caracteres.' })
-  .nullable()
-  .optional()
-  .transform((value) => (value ? value : null))
-
-const categoryId = z.uuid({ error: 'Escolha a categoria.' })
+import {
+  amountCentsSchema as amountCents,
+  categoryIdSchema as categoryId,
+  descriptionSchema as description,
+  notesSchema as notes,
+  repeatSchema,
+} from './fields'
 
 const baseFields = {
   description,
@@ -35,7 +19,13 @@ const baseFields = {
   status: z.enum(['paid', 'pending'], { error: 'Escolha o status.' }),
   accountId: z.uuid({ error: 'Escolha a conta.' }),
   notes,
+  repeat: repeatSchema,
 }
+
+const repeatEndsAfterStart = (value: { date: string; repeat: { endDate: string | null } | null }) =>
+  value.repeat === null || value.repeat.endDate === null || value.repeat.endDate >= value.date
+
+const REPEAT_END_ISSUE = { error: 'A data final precisa ser igual ou depois da data do lançamento.', path: ['repeatEndDate'] }
 
 /** Lançamento em conta (receita, despesa ou transferência). */
 export const transactionSchema = z.discriminatedUnion('type', [
@@ -47,7 +37,7 @@ export const transactionSchema = z.discriminatedUnion('type', [
       error: 'Escolha uma conta diferente da origem.',
       path: ['destinationAccountId'],
     }),
-])
+]).refine(repeatEndsAfterStart, REPEAT_END_ISSUE)
 
 export type TransactionInput = z.output<typeof transactionSchema>
 
@@ -72,6 +62,7 @@ export const cardTransactionSchema = z
     creditCardId: z.uuid({ error: 'Escolha o cartão.' }),
     installmentsCount: installmentNumber,
     currentInstallment: installmentNumber.nullable(),
+    repeat: repeatSchema,
   })
   .refine((value) => value.type === 'expense' || (value.installmentsCount === 1 && value.currentInstallment === null), {
     error: 'Estorno não pode ser parcelado.',
@@ -89,6 +80,11 @@ export const cardTransactionSchema = z
     error: 'Valor pequeno demais para tantas parcelas.',
     path: ['amountCents'],
   })
+  .refine((value) => value.repeat === null || (value.type === 'expense' && value.installmentsCount === 1 && value.currentInstallment === null), {
+    error: 'No cartão, só compras à vista se repetem.',
+    path: ['repeatFrequency'],
+  })
+  .refine(repeatEndsAfterStart, REPEAT_END_ISSUE)
 
 export type CardTransactionInput = z.output<typeof cardTransactionSchema>
 
@@ -142,11 +138,25 @@ export type TransactionFormValues = {
   /** Compra já em andamento: o valor passa a ser o de cada parcela. */
   inProgress: boolean
   currentInstallment: number
+  /** "Repetir": '' = não repete. */
+  repeatFrequency: RecurrenceFrequency | ''
+  /** "Até" (opcional); '' = sem data final. */
+  repeatEndDate: string
 }
 
 /** Receita/despesa com um cartão em "Pagar com". */
 export function isCardForm(values: Pick<TransactionFormValues, 'type' | 'creditCardId'>): boolean {
   return values.type !== 'transfer' && values.creditCardId !== ''
+}
+
+/** "Repetir" vale para conta e transferência; no cartão, só compra à vista (sem parcelas nem em andamento). */
+export function canRepeat(values: Pick<TransactionFormValues, 'type' | 'creditCardId' | 'installmentsCount' | 'inProgress'>): boolean {
+  if (!isCardForm(values)) return true
+  return values.type === 'expense' && values.installmentsCount === 1 && !values.inProgress
+}
+
+function toRepeat(values: TransactionFormValues) {
+  return values.repeatFrequency ? { frequency: values.repeatFrequency, endDate: values.repeatEndDate || null } : null
 }
 
 /** Converte o formulário na entrada do schema de conta, mantendo só os campos do tipo escolhido. */
@@ -158,6 +168,7 @@ export function toTransactionInput(values: TransactionFormValues): unknown {
     status: values.status,
     accountId: values.accountId || undefined,
     notes: values.notes,
+    repeat: toRepeat(values),
   }
   if (values.type === 'transfer') {
     return { type: 'transfer', ...base, destinationAccountId: values.destinationAccountId || undefined }
@@ -178,6 +189,7 @@ export function toCardTransactionInput(values: TransactionFormValues): unknown {
     creditCardId: values.creditCardId || undefined,
     installmentsCount: canSplit ? values.installmentsCount : 1,
     currentInstallment: canSplit && values.inProgress ? values.currentInstallment : null,
+    repeat: canRepeat(values) ? toRepeat(values) : null,
   }
 }
 

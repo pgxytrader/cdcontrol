@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deletionSnapshotSchema } from './transaction-record'
+import { deletionSnapshotSchema, recurrenceSnapshotSchema } from './transaction-record'
 
 const ID = '11111111-1111-4111-8111-111111111111'
 const CAT = '33333333-3333-4333-8333-333333333333'
@@ -21,6 +21,8 @@ const record = {
   invoice_id: INV,
   installment_plan_id: PLAN,
   installment_number: 1,
+  recurrence_id: null,
+  occurrence_date: null,
   source: 'manual',
   external_id: null,
   notes: null,
@@ -53,5 +55,44 @@ describe('deletionSnapshotSchema', () => {
     expect(deletionSnapshotSchema.safeParse({ plan: null, rows: [{ ...record, type: 'hack' }] }).success).toBe(false)
     expect(deletionSnapshotSchema.safeParse({ plan: null, rows: [{ ...record, id: 'x' }] }).success).toBe(false)
     expect(deletionSnapshotSchema.safeParse({ plan: { ...plan, installments_count: 99 }, rows: [record] }).success).toBe(false)
+  })
+})
+
+describe('recurrenceSnapshotSchema', () => {
+  const REC = '77777777-7777-4777-8777-777777777777'
+  const recurrence = {
+    id: REC,
+    type: 'expense',
+    description: 'Aluguel',
+    amount_cents: 200_000,
+    category_id: CAT,
+    account_id: ID,
+    destination_account_id: null,
+    credit_card_id: null,
+    frequency: 'monthly',
+    start_date: '2026-09-10',
+    end_date: null,
+    generated_until: '2027-10-05',
+    notes: null,
+  }
+  const row = {
+    ...record,
+    account_id: ID,
+    credit_card_id: null,
+    invoice_id: null,
+    installment_plan_id: null,
+    installment_number: null,
+    recurrence_id: REC,
+    occurrence_date: '2026-11-10',
+    source: 'recurrence',
+  }
+
+  it('aceita a série e as linhas apagadas', () => {
+    expect(recurrenceSnapshotSchema.safeParse({ recurrence, rows: [row] }).success).toBe(true)
+  })
+
+  it('recusa frequência desconhecida e lista vazia', () => {
+    expect(recurrenceSnapshotSchema.safeParse({ recurrence: { ...recurrence, frequency: 'daily' }, rows: [row] }).success).toBe(false)
+    expect(recurrenceSnapshotSchema.safeParse({ recurrence, rows: [] }).success).toBe(false)
   })
 })

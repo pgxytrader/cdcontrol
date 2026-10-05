@@ -70,6 +70,8 @@ export function rowToFormValues(row: TransactionRow): TransactionFormValues {
     installmentsCount: row.installment_plans?.installments_count ?? 1,
     inProgress: false,
     currentInstallment: row.installment_number ?? 1,
+    repeatFrequency: '',
+    repeatEndDate: '',
   }
 }
 
