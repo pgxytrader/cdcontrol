@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, SlidersHorizontal, X } from 'lucide-react'
+import { Download, Search, SlidersHorizontal, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { NativeSelect } from '@/components/form/native-select'
@@ -10,6 +10,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { buildCategoryTree, type Category } from '@/lib/categories'
 import type { TransactionStatus, TransactionType } from '@/lib/finance/types'
 import {
+  buildExportHref,
   buildTransactionsHref,
   hasActiveFilters,
   normalizeSearch,
@@ -145,6 +146,13 @@ export function TransactionsToolbar({ query, categories, accounts, cards }: Tool
             </div>
           </SheetContent>
         </Sheet>
+        <Button asChild variant="outline">
+          {/* <a> comum: download de arquivo, não navegação do Next */}
+          <a href={buildExportHref(query)} download aria-label="Exportar CSV">
+            <Download aria-hidden />
+            <span className="hidden sm:inline">Exportar CSV</span>
+          </a>
+        </Button>
       </div>
       <div className="hidden gap-2 lg:grid lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]">
         <FilterControls query={query} categories={categories} accounts={accounts} cards={cards} onChange={applyFilters} />

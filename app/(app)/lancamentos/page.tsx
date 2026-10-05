@@ -5,11 +5,10 @@ import { TransactionList } from '@/components/transactions/transaction-list'
 import { TransactionsToolbar } from '@/components/transactions/transactions-toolbar'
 import { listAccounts } from '@/lib/accounts'
 import { listCardOptions } from '@/lib/cards'
-import { expandCategoryFilter } from '@/lib/categories'
 import { listCategories } from '@/lib/categories-query'
 import { todayISO } from '@/lib/dates'
 import { summarizeMonth } from '@/lib/finance/summary'
-import { filterParams, parseTransactionsQuery } from '@/lib/transaction-filters'
+import { filterParams, parseTransactionsQuery, queryFilters } from '@/lib/transaction-filters'
 import { applyEffectiveStatus, rowToLedger } from '@/lib/transaction-mappers'
 import { listMonthTransactions, SEARCH_LIMIT, searchTransactions } from '@/lib/transactions'
 
@@ -26,13 +25,7 @@ export default async function TransactionsPage({ searchParams }: Props) {
     listCardOptions(),
   ])
 
-  const filters = {
-    type: query.filters.type,
-    status: query.filters.status,
-    accountId: query.filters.accountId,
-    cardId: query.filters.cardId,
-    categoryIds: query.filters.categoryId ? expandCategoryFilter(query.filters.categoryId, categories) : undefined,
-  }
+  const filters = queryFilters(query, categories)
   const found = query.q ? await searchTransactions(query.q, filters, today) : await listMonthTransactions(query.ym, filters, today)
   // Compras no cartão: previsto/realizado pela data
   const rows = found.map((row) => applyEffectiveStatus(row, today))
