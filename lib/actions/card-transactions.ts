@@ -126,6 +126,8 @@ export async function updateCardTransaction(id: unknown, input: unknown): Promis
       invoice_id: invoiceId,
     })
     .eq('id', parsedId.data)
+    // Pagamento de fatura só muda por updateInvoicePayment
+    .neq('type', 'invoice_payment')
     .select('id')
   if (error) return { ok: false, error: translateError(error) }
   if (data.length === 0) return { ok: false, error: GENERIC_ERROR }
@@ -186,14 +188,21 @@ export async function deleteInstallments(id: unknown, scope: unknown): Promise<A
   if (error) return { ok: false, error: translateError(error) }
   if (rows.length === 0) return { ok: false, error: GENERIC_ERROR }
 
-  const { count } = await supabase
+  // As parcelas já foram excluídas: falha na limpeza do plano não desfaz isso. Nesse caso o plano fica (plan: null)
+  // e o snapshot continua igual ao que foi de fato excluído, para o "Desfazer" funcionar.
+  const { count, error: countError } = await supabase
     .from('transactions')
     .select('id', { count: 'exact', head: true })
     .eq('installment_plan_id', installment.planId)
   let removedPlan: PlanRecord | null = null
-  if (count === 0) {
-    const { error: removeError } = await supabase.from('installment_plans').delete().eq('id', installment.planId)
-    if (!removeError) removedPlan = plan as PlanRecord
+  if (!countError && count === 0) {
+    const { data: removed, error: removeError } = await supabase
+      .from('installment_plans')
+      .delete()
+      .eq('id', installment.planId)
+      .select('id')
+    // Só entra no snapshot se o plano saiu mesmo
+    if (!removeError && removed.length > 0) removedPlan = plan as PlanRecord
   }
 
   done()

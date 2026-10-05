@@ -54,6 +54,8 @@ export async function updateTransaction(id: unknown, input: unknown): Promise<Ac
     .update(inputToRow(parsed.data, household.id))
     .eq('id', parsedId.data)
     .is('installment_plan_id', null)
+    // Pagamento de fatura só muda por updateInvoicePayment
+    .neq('type', 'invoice_payment')
     .select('id')
   if (error) return { ok: false, error: translateError(error) }
   if (data.length === 0) return { ok: false, error: GENERIC_ERROR }

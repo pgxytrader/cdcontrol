@@ -67,6 +67,13 @@ describe('rescheduleCard', () => {
     expect(change.moves).toEqual([])
   })
 
+  it('o ajuste à fatura aberta mais antiga também pode gerar a mudança', () => {
+    // Compra de 26/09 parada em novembro; com fechamento 28 ela cairia em setembro (fechada) → vai para outubro
+    const newSchedule = { closingDay: 28, dueDay: 5 }
+    const change = rescheduleCard(newSchedule, invoices, [single('d', 'inv-nov', '2026-09-26')], [], today)
+    expect(change.moves).toEqual([{ transactionId: 'd', cycle: cycleForClosingMonth(newSchedule, '2026-10-01') }])
+  })
+
   it('plano normal ainda não cobrado recalcula a âncora; os demais mantêm', () => {
     const newSchedule = { closingDay: 15, dueDay: 25 }
     const plans: SchedulePlan[] = [
