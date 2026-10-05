@@ -68,15 +68,20 @@ export function rowToInput(row: TransactionRow): TransactionInput {
 
 export function rowToFormValues(row: TransactionRow): TransactionFormValues {
   return {
-    type: row.type,
+    // Pagamentos de fatura não abrem este formulário (têm o da tela da fatura)
+    type: row.type === 'invoice_payment' ? 'expense' : row.type,
     amountCents: row.amount_cents,
     description: row.description,
     categoryId: row.category_id ?? '',
     accountId: row.account_id ?? '',
+    creditCardId: row.type === 'invoice_payment' ? '' : (row.credit_card_id ?? ''),
     destinationAccountId: row.destination_account_id ?? '',
     date: row.date,
     status: row.status,
     notes: row.notes ?? '',
+    installmentsCount: row.installment_plans?.installments_count ?? 1,
+    inProgress: false,
+    currentInstallment: row.installment_number ?? 1,
   }
 }
 

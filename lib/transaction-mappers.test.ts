@@ -61,10 +61,32 @@ describe('mapeadores de lançamento', () => {
       description: 'Padaria',
       categoryId: '',
       accountId: 'acc-1',
+      creditCardId: '',
       destinationAccountId: 'acc-2',
       date: '2026-10-04',
       status: 'paid',
       notes: '',
+      installmentsCount: 1,
+      inProgress: false,
+      currentInstallment: 1,
+    })
+  })
+
+  it('rowToFormValues de uma parcela no cartão', () => {
+    const installment = {
+      ...row,
+      account_id: null,
+      credit_card_id: 'card-1',
+      invoice_id: 'inv-1',
+      installment_plan_id: 'plan-1',
+      installment_number: 3,
+      installment_plans: { installments_count: 10 },
+    }
+    expect(rowToFormValues(installment)).toMatchObject({
+      accountId: '',
+      creditCardId: 'card-1',
+      installmentsCount: 10,
+      currentInstallment: 3,
     })
   })
 

@@ -14,11 +14,11 @@ import { createTransaction, deleteTransaction, restoreTransaction, updateTransac
 import { activeCategories, buildCategoryTree, chipCategories, type Category } from '@/lib/categories'
 import { addDaysISO, todayISO } from '@/lib/dates'
 import { defaultStatus } from '@/lib/finance/status'
-import type { TransactionStatus, TransactionType } from '@/lib/finance/types'
+import type { TransactionStatus } from '@/lib/finance/types'
 import { applyActionErrors } from '@/lib/forms'
 import { pickDefaultAccountId } from '@/lib/transaction-mappers'
 import { cn } from '@/lib/utils'
-import { toTransactionInput, transactionFormResolver, type TransactionFormValues } from '@/lib/validation/transaction'
+import { toTransactionInput, transactionFormResolver, type FormTransactionType, type TransactionFormValues } from '@/lib/validation/transaction'
 import { useTransactionFormData } from './form-data-context'
 
 const TYPE_OPTIONS = [
@@ -60,10 +60,14 @@ export function TransactionForm({ transactionId, initial, onDone }: TransactionF
       description: '',
       categoryId: '',
       accountId: pickDefaultAccountId(activeAccounts, data.lastAccountId) ?? '',
+      creditCardId: '',
       destinationAccountId: '',
       date: today,
       status: 'paid',
       notes: '',
+      installmentsCount: 1,
+      inProgress: false,
+      currentInstallment: 1,
     },
   })
   const [statusTouched, setStatusTouched] = useState(Boolean(initial))
@@ -93,7 +97,7 @@ export function TransactionForm({ transactionId, initial, onDone }: TransactionF
 
   const revalidate = { shouldValidate: form.formState.isSubmitted }
 
-  function changeType(value: TransactionType) {
+  function changeType(value: FormTransactionType) {
     form.setValue('type', value)
     form.setValue('categoryId', '', revalidate)
     setShowAllCategories(false)
