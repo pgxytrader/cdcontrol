@@ -5,7 +5,7 @@ import { useState } from 'react'
 import type { Category } from '@/lib/categories'
 import { invoiceHref } from '@/lib/invoice-labels'
 import { groupByDay, groupByMonth, splitPending, type TransactionGroup } from '@/lib/transaction-grouping'
-import { installmentInfo, rowToFormValues, type TransactionRow } from '@/lib/transaction-mappers'
+import { installmentInfo, rowToFormValues, seriesInfo, type TransactionRow } from '@/lib/transaction-mappers'
 import { TransactionItem } from './transaction-item'
 import { TransactionModal } from './transaction-modal'
 
@@ -95,6 +95,7 @@ export function TransactionList({ rows, categories, accounts, cards, mode }: Tra
         transactionId={editing?.id}
         initial={editing ? rowToFormValues(editing) : undefined}
         installment={editing ? installmentInfo(editing) : undefined}
+        series={editing ? seriesInfo(editing) : undefined}
       />
     </>
   )

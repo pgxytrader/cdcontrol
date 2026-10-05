@@ -1,5 +1,6 @@
 'use client'
 
+import { Repeat } from 'lucide-react'
 import { useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
@@ -12,18 +13,21 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { ActionResult } from '@/lib/action-result'
 import { createCardTransaction, deleteInstallments, updateCardTransaction, updateInstallments } from '@/lib/actions/card-transactions'
+import { deleteSeriesFollowing, restoreSeries, updateSeriesFollowing } from '@/lib/actions/recurrences'
 import { createTransaction, deleteTransaction, restoreTransactions, updateTransaction } from '@/lib/actions/transactions'
 import { activeCategories, buildCategoryTree, chipCategories, type Category } from '@/lib/categories'
 import { addDaysISO, formatISODateBR, formatYearMonthLabel, todayISO, yearMonthOfISO } from '@/lib/dates'
+import { describeSchedule, FREQUENCY_LABELS, type RecurrenceFrequency } from '@/lib/finance/recurrence'
 import { MAX_INSTALLMENTS, splitInstallments } from '@/lib/finance/installments'
 import { cycleForDate } from '@/lib/finance/invoice'
 import { formatBRL } from '@/lib/finance/money'
 import { defaultStatus } from '@/lib/finance/status'
 import type { TransactionStatus } from '@/lib/finance/types'
 import { applyActionErrors } from '@/lib/forms'
-import { decodeSource, encodeSource, pickDefaultAccountId, pickDefaultSource, type InstallmentInfo } from '@/lib/transaction-mappers'
+import { decodeSource, encodeSource, pickDefaultAccountId, pickDefaultSource, type InstallmentInfo, type SeriesInfo } from '@/lib/transaction-mappers'
 import { cn } from '@/lib/utils'
 import {
+  canRepeat,
   isCardForm,
   toCardTransactionInput,
   toTransactionInput,
@@ -32,7 +36,7 @@ import {
   type InstallmentScope,
   type TransactionFormValues,
 } from '@/lib/validation/transaction'
-import type { DeletionSnapshot } from '@/lib/validation/transaction-record'
+import type { DeletionSnapshot, RecurrenceSnapshot } from '@/lib/validation/transaction-record'
 import { useTransactionFormData } from './form-data-context'
 
 const TYPE_OPTIONS = [
@@ -45,6 +49,15 @@ const STATUS_OPTIONS = [
   { value: 'paid', label: 'Pago' },
   { value: 'pending', label: 'Pendente' },
 ] as const
+
+const REPEAT_OPTIONS = [
+  { value: '', label: 'Não' },
+  { value: 'weekly', label: 'Semanal' },
+  { value: 'monthly', label: 'Mensal' },
+  { value: 'yearly', label: 'Anual' },
+] as const
+
+type Scope = 'one' | 'rest'
 
 const NUMBERS = Array.from({ length: MAX_INSTALLMENTS }, (_, index) => index + 1)
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -68,10 +81,12 @@ type TransactionFormProps = {
   initial?: TransactionFormValues
   /** Parcela de uma compra: valor, cartão, data e parcelas ficam travados. */
   installment?: InstallmentInfo
+  /** Lançamento de uma série: salvar e excluir perguntam "só este" ou "este e os próximos". */
+  series?: SeriesInfo
   onDone: () => void
 }
 
-export function TransactionForm({ transactionId, initial, installment, onDone }: TransactionFormProps) {
+export function TransactionForm({ transactionId, initial, installment, series, onDone }: TransactionFormProps) {
   const data = useTransactionFormData()
   const [today] = useState(() => todayISO())
   const activeAccounts = data.accounts.filter((account) => !account.archived)
@@ -91,6 +106,8 @@ export function TransactionForm({ transactionId, initial, installment, onDone }:
       installmentsCount: 1,
       inProgress: false,
       currentInstallment: 1,
+      repeatFrequency: '',
+      repeatEndDate: '',
     },
   })
   const [statusTouched, setStatusTouched] = useState(Boolean(initial))
@@ -100,8 +117,10 @@ export function TransactionForm({ transactionId, initial, installment, onDone }:
   const [busy, setBusy] = useState(false)
   const { errors, isSubmitting } = form.formState
   const locked = Boolean(installment)
+  // Parcela ou lançamento de série: salvar e excluir perguntam o alcance
+  const scoped = locked || Boolean(series)
 
-  const [type, date, status, accountId, creditCardId, destinationAccountId, categoryId, amountCents, installmentsCount, inProgress] =
+  const [type, date, status, accountId, creditCardId, destinationAccountId, categoryId, amountCents, installmentsCount, inProgress, repeatFrequency, repeatEndDate] =
     useWatch({
       control: form.control,
       name: [
@@ -115,6 +134,8 @@ export function TransactionForm({ transactionId, initial, installment, onDone }:
         'amountCents',
         'installmentsCount',
         'inProgress',
+        'repeatFrequency',
+        'repeatEndDate',
       ],
     })
 
@@ -138,7 +159,8 @@ export function TransactionForm({ transactionId, initial, installment, onDone }:
       return account ? date < account.initialBalanceDate : false
     })
   const cycle = isCard && card && !locked && ISO_DATE.test(date) ? cycleForDate(card, date) : null
-  const canSplit = isCard && type === 'expense' && !transactionId
+  const canSplit = isCard && type === 'expense' && !transactionId && !repeatFrequency
+  const showRepeat = !transactionId && canRepeat({ type, creditCardId, installmentsCount, inProgress })
   const firstInstallment =
     canSplit && !inProgress && installmentsCount > 1 && amountCents >= installmentsCount
       ? splitInstallments(amountCents, installmentsCount)[0]
@@ -187,6 +209,17 @@ export function TransactionForm({ transactionId, initial, installment, onDone }:
     form.setValue('status', value)
   }
 
+  function changeRepeat(value: RecurrenceFrequency | '') {
+    form.setValue('repeatFrequency', value, revalidate)
+    if (value) {
+      // Série e parcelamento não combinam
+      form.setValue('installmentsCount', 1)
+      form.setValue('inProgress', false)
+    } else {
+      form.setValue('repeatEndDate', '', revalidate)
+    }
+  }
+
   function selectCategory(id: string) {
     form.setValue('categoryId', id, revalidate)
     setShowAllCategories(false)
@@ -205,9 +238,22 @@ export function TransactionForm({ transactionId, initial, installment, onDone }:
     })
   }
 
+  function toastSeriesDeleted(snapshot: RecurrenceSnapshot) {
+    toast('Lançamentos excluídos.', {
+      action: {
+        label: 'Desfazer',
+        onClick: async () => {
+          const restored = await restoreSeries(snapshot)
+          if (restored.ok) toast.success('Lançamentos restaurados.')
+          else toast.error(restored.error)
+        },
+      },
+    })
+  }
+
   const onSubmit = form.handleSubmit(async (values) => {
     // Parcela: primeiro pergunta onde aplicar
-    if (locked) {
+    if (scoped) {
       setScopeAction('save')
       return
     }
@@ -229,7 +275,7 @@ export function TransactionForm({ transactionId, initial, installment, onDone }:
 
   async function onDelete() {
     if (!transactionId) return
-    if (locked) {
+    if (scoped) {
       setScopeAction('delete')
       return
     }
@@ -242,40 +288,88 @@ export function TransactionForm({ transactionId, initial, installment, onDone }:
     onDone()
   }
 
-  async function applyScope(scope: InstallmentScope) {
+  /** Parcela: só os campos descritivos (Fase 3). */
+  async function applyInstallmentScope(id: string, action: 'save' | 'delete', scope: InstallmentScope): Promise<boolean> {
+    if (action === 'save') {
+      const values = form.getValues()
+      const result = await updateInstallments(id, { scope, description: values.description, categoryId: values.categoryId, notes: values.notes })
+      if (!result.ok) {
+        applyActionErrors(form, result)
+        return false
+      }
+      toast.success(scope === 'one' ? 'Parcela atualizada.' : 'Parcelas atualizadas.')
+      return true
+    }
+    const result = await deleteInstallments(id, scope)
+    if (!result.ok) {
+      toast.error(result.error)
+      return false
+    }
+    toastDeleted(result.data, scope === 'one' ? 'Parcela excluída.' : 'Parcelas excluídas.')
+    return true
+  }
+
+  /** Série: "só este" usa as actions normais; "este e os próximos" muda a série (Fase 4). */
+  async function applySeriesScope(id: string, action: 'save' | 'delete', scope: Scope): Promise<boolean> {
+    if (action === 'delete') {
+      if (scope === 'one') {
+        const result = await deleteTransaction(id)
+        if (!result.ok) {
+          toast.error(result.error)
+          return false
+        }
+        toastDeleted(result.data, 'Lançamento excluído.')
+        return true
+      }
+      const result = await deleteSeriesFollowing(id)
+      if (!result.ok) {
+        toast.error(result.error)
+        return false
+      }
+      toastSeriesDeleted(result.data)
+      return true
+    }
+
+    const values = form.getValues()
+    const onCard = isCardForm(values)
+    const input = onCard ? toCardTransactionInput(values) : toTransactionInput(values)
+    let result: ActionResult<unknown>
+    if (scope === 'rest') result = await updateSeriesFollowing(id, input, onCard ? 'card' : 'account')
+    else result = onCard ? await updateCardTransaction(id, input) : await updateTransaction(id, input)
+    if (!result.ok) {
+      applyActionErrors(form, result)
+      return false
+    }
+    toast.success(scope === 'one' ? 'Lançamento atualizado.' : 'Este e os próximos atualizados.')
+    return true
+  }
+
+  async function applyScope(scope: Scope) {
     if (!transactionId || !scopeAction) return
     setBusy(true)
     try {
-      if (scopeAction === 'save') {
-        const values = form.getValues()
-        const result = await updateInstallments(transactionId, {
-          scope,
-          description: values.description,
-          categoryId: values.categoryId,
-          notes: values.notes,
-        })
-        if (!result.ok) {
-          applyActionErrors(form, result)
-          return
-        }
-        toast.success(scope === 'one' ? 'Parcela atualizada.' : 'Parcelas atualizadas.')
-      } else {
-        const result = await deleteInstallments(transactionId, scope)
-        if (!result.ok) {
-          toast.error(result.error)
-          return
-        }
-        toastDeleted(result.data, scope === 'one' ? 'Parcela excluída.' : 'Parcelas excluídas.')
-      }
-      onDone()
+      const ok = series
+        ? await applySeriesScope(transactionId, scopeAction, scope)
+        : await applyInstallmentScope(transactionId, scopeAction, scope === 'one' ? 'one' : 'future')
+      if (ok) onDone()
     } finally {
       setBusy(false)
       setScopeAction(null)
     }
   }
 
+  const scopeLabels = series
+    ? { one: 'Só este', rest: 'Este e os próximos' }
+    : { one: 'Só esta parcela', rest: 'Esta e as futuras' }
+
   return (
     <form onSubmit={onSubmit} className="space-y-5 pb-2" noValidate>
+      {series ? (
+        <p className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm text-muted-foreground">
+          <Repeat className="size-4 shrink-0" aria-hidden />
+          {FREQUENCY_LABELS[series.frequency]} · {initial?.description}. Frequência e data final mudam na tela Recorrências.
+        </p>
+      ) : null}
       {locked ? null : <Segmented label="Tipo de lançamento" value={type} options={TYPE_OPTIONS} onChange={changeType} />}
 
       <div>
@@ -526,6 +620,38 @@ export function TransactionForm({ transactionId, initial, installment, onDone }:
         <p className="-mt-3 text-sm text-warning">Este lançamento não afeta o saldo atual desta conta (data anterior ao saldo inicial).</p>
       ) : null}
 
+      {showRepeat ? (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Repetir</p>
+          <Segmented label="Repetir" value={repeatFrequency} options={REPEAT_OPTIONS} onChange={changeRepeat} />
+          {repeatFrequency ? (
+            <>
+              <Field id="tx-repeat-end" label="Até (opcional)" error={errors.repeatEndDate?.message}>
+                <Input
+                  id="tx-repeat-end"
+                  type="date"
+                  min={ISO_DATE.test(date) ? date : undefined}
+                  aria-invalid={Boolean(errors.repeatEndDate)}
+                  aria-describedby={errors.repeatEndDate ? 'tx-repeat-end-error' : undefined}
+                  {...form.register('repeatEndDate')}
+                />
+              </Field>
+              {ISO_DATE.test(date) ? (
+                <p className="text-sm text-muted-foreground">
+                  {describeSchedule({ frequency: repeatFrequency, startDate: date, endDate: ISO_DATE.test(repeatEndDate) ? repeatEndDate : null })}.
+                  Os próximos ficam como previstos.
+                </p>
+              ) : null}
+            </>
+          ) : null}
+          {errors.repeatFrequency ? (
+            <p role="alert" className="text-sm text-expense">
+              {errors.repeatFrequency.message}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {isCard ? null : <Segmented label="Status" value={status} options={STATUS_OPTIONS} onChange={changeStatus} />}
 
       {showNotes ? (
@@ -548,10 +674,10 @@ export function TransactionForm({ transactionId, initial, installment, onDone }:
           <p className="text-sm font-medium">{scopeAction === 'save' ? 'Aplicar a alteração em:' : 'Excluir:'}</p>
           <div className="grid gap-2 sm:grid-cols-2">
             <Button type="button" variant="outline" disabled={busy} onClick={() => applyScope('one')}>
-              Só esta parcela
+              {scopeLabels.one}
             </Button>
-            <Button type="button" variant="outline" disabled={busy} onClick={() => applyScope('future')}>
-              Esta e as futuras
+            <Button type="button" variant="outline" disabled={busy} onClick={() => applyScope('rest')}>
+              {scopeLabels.rest}
             </Button>
           </div>
           <Button type="button" variant="ghost" className="w-full" disabled={busy} onClick={() => setScopeAction(null)}>

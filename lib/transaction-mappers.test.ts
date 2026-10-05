@@ -9,6 +9,7 @@ import {
   pickDefaultSource,
   rowToFormValues,
   rowToLedger,
+  seriesInfo,
   type TransactionRow,
 } from './transaction-mappers'
 import type { TransactionInput } from './validation/transaction'
@@ -31,6 +32,9 @@ const row: TransactionRow = {
   created_at: '2026-10-04T12:00:00Z',
   installment_plans: null,
   card_invoices: null,
+  recurrence_id: null,
+  occurrence_date: null,
+  recurrences: null,
 }
 
 describe('mapeadores de lançamento', () => {
@@ -165,5 +169,14 @@ describe('mapeadores de lançamento', () => {
     expect(applyEffectiveStatus({ ...card, date: '2026-11-04', status: 'paid' }, '2026-10-04').status).toBe('pending')
     expect(applyEffectiveStatus({ ...row, status: 'pending' }, '2026-12-01').status).toBe('pending')
     expect(applyEffectiveStatus(row, '2026-10-04')).toBe(row)
+  })
+})
+
+describe('seriesInfo', () => {
+  it('só existe em lançamentos de série', () => {
+    expect(seriesInfo(row)).toBeUndefined()
+    expect(
+      seriesInfo({ ...row, recurrence_id: '77777777-7777-4777-8777-777777777777', occurrence_date: '2026-10-10', recurrences: { frequency: 'monthly' } }),
+    ).toEqual({ frequency: 'monthly' })
   })
 })

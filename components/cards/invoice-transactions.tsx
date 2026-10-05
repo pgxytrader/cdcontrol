@@ -5,7 +5,7 @@ import { TransactionItem } from '@/components/transactions/transaction-item'
 import { TransactionModal } from '@/components/transactions/transaction-modal'
 import type { Category } from '@/lib/categories'
 import { formatISODateBR } from '@/lib/dates'
-import { installmentInfo, rowToFormValues, type TransactionRow } from '@/lib/transaction-mappers'
+import { installmentInfo, rowToFormValues, seriesInfo, type TransactionRow } from '@/lib/transaction-mappers'
 import { PaymentModal } from './payment-form'
 
 type InvoiceTransactionsProps = {
@@ -81,6 +81,7 @@ export function InvoiceTransactions({
         transactionId={editing?.id}
         initial={editing ? rowToFormValues(editing) : undefined}
         installment={editing ? installmentInfo(editing) : undefined}
+        series={editing ? seriesInfo(editing) : undefined}
       />
       {invoiceId ? (
         <PaymentModal

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { ResponsiveModal } from '@/components/layout/responsive-modal'
 import { Button } from '@/components/ui/button'
-import type { InstallmentInfo } from '@/lib/transaction-mappers'
+import type { InstallmentInfo, SeriesInfo } from '@/lib/transaction-mappers'
 import type { TransactionFormValues } from '@/lib/validation/transaction'
 import { useTransactionFormData } from './form-data-context'
 import { TransactionForm } from './transaction-form'
@@ -14,12 +14,13 @@ type TransactionModalProps = {
   transactionId?: string
   initial?: TransactionFormValues
   installment?: InstallmentInfo
+  series?: SeriesInfo
 }
 
-export function TransactionModal({ open, onOpenChange, transactionId, initial, installment }: TransactionModalProps) {
+export function TransactionModal({ open, onOpenChange, transactionId, initial, installment, series }: TransactionModalProps) {
   const data = useTransactionFormData()
   const hasSources = data.accounts.some((account) => !account.archived) || data.cards.some((card) => !card.archived)
-  const title = installment ? 'Editar parcela' : transactionId ? 'Editar lançamento' : 'Novo lançamento'
+  const title = installment ? 'Editar parcela' : series ? 'Editar lançamento recorrente' : transactionId ? 'Editar lançamento' : 'Novo lançamento'
 
   return (
     <ResponsiveModal open={open} onOpenChange={onOpenChange} title={title}>
@@ -29,6 +30,7 @@ export function TransactionModal({ open, onOpenChange, transactionId, initial, i
           transactionId={transactionId}
           initial={initial}
           installment={installment}
+          series={series}
           onDone={() => onOpenChange(false)}
         />
       ) : (

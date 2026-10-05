@@ -1,4 +1,4 @@
-import { ArrowLeftRight, CreditCard } from 'lucide-react'
+import { ArrowLeftRight, CreditCard, Repeat } from 'lucide-react'
 import { CategoryIcon } from '@/components/categories/category-icon'
 import type { Category } from '@/lib/categories'
 import { installmentLabel } from '@/lib/finance/installments'
@@ -35,7 +35,15 @@ export function TransactionItem({ row, category, sourceLabel, onClick }: Transac
         <CategoryIcon name={category?.icon ?? 'circle-ellipsis'} color={category?.color ?? '#64748b'} />
       )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">{title}</span>
+        <span className="flex min-w-0 items-center gap-1 font-medium">
+          <span className="truncate">{title}</span>
+          {row.recurrence_id ? (
+            <>
+              <Repeat className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="sr-only">(recorrente)</span>
+            </>
+          ) : null}
+        </span>
         <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
       </span>
       <span

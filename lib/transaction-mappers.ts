@@ -1,9 +1,10 @@
+import type { RecurrenceFrequency } from '@/lib/finance/recurrence'
 import { effectiveStatus } from '@/lib/finance/status'
 import type { LedgerTransaction, TransactionStatus, TransactionType } from '@/lib/finance/types'
 import type { TransactionFormValues, TransactionInput } from '@/lib/validation/transaction'
 
 export const TRANSACTION_COLUMNS =
-  'id, type, description, amount_cents, date, status, category_id, account_id, destination_account_id, credit_card_id, invoice_id, installment_plan_id, installment_number, notes, created_at, installment_plans(installments_count), card_invoices(closing_month)'
+  'id, type, description, amount_cents, date, status, category_id, account_id, destination_account_id, credit_card_id, invoice_id, installment_plan_id, installment_number, notes, created_at, installment_plans(installments_count), card_invoices(closing_month), recurrence_id, occurrence_date, recurrences(frequency)'
 
 export type TransactionRow = {
   id: string
@@ -24,6 +25,9 @@ export type TransactionRow = {
   created_at: string
   installment_plans: { installments_count: number } | null
   card_invoices: { closing_month: string } | null
+  recurrence_id: string | null
+  occurrence_date: string | null
+  recurrences: { frequency: RecurrenceFrequency } | null
 }
 
 export type TransactionInsertRow = {
@@ -138,4 +142,12 @@ export function pickDefaultSource(
   const accountId = pickDefaultAccountId(accounts, lastAccountId)
   if (accountId) return { accountId, creditCardId: '' }
   return { accountId: '', creditCardId: cards[0]?.id ?? '' }
+}
+
+export type SeriesInfo = { frequency: RecurrenceFrequency }
+
+/** Frequência da série, se o lançamento veio de uma recorrência. */
+export function seriesInfo(row: TransactionRow): SeriesInfo | undefined {
+  if (row.recurrence_id === null) return undefined
+  return { frequency: row.recurrences?.frequency ?? 'monthly' }
 }
