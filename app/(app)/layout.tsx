@@ -5,12 +5,17 @@ import { TransactionFormDataProvider, type TransactionFormData } from '@/compone
 import { listAccounts } from '@/lib/accounts'
 import { listCardOptions } from '@/lib/cards'
 import { listCategories, topCategoryIds } from '@/lib/categories-query'
+import { todayISO } from '@/lib/dates'
 import { getCurrentHousehold } from '@/lib/household'
 import { getMyProfile } from '@/lib/profile'
+import { syncRecurrences } from '@/lib/recurrences-sync'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const household = await getCurrentHousehold()
   if (!household) redirect('/bem-vindo')
+
+  // Gera os lançamentos recorrentes que faltam antes de carregar os dados (PRD 8.6)
+  await syncRecurrences(todayISO())
 
   const [accounts, cards, categories, topExpense, topIncome, profile] = await Promise.all([
     listAccounts({ includeArchived: true }),

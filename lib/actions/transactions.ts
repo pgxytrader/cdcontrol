@@ -3,11 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import { invalidInput, type ActionResult } from '@/lib/action-result'
 import { getCurrentUser } from '@/lib/auth'
+import { todayISO } from '@/lib/dates'
 import { getCurrentHousehold } from '@/lib/household'
+import { insertSeries } from '@/lib/recurrence-server'
 import { GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
 import { createClient } from '@/lib/supabase/server'
 import { inputToRow } from '@/lib/transaction-mappers'
 import { uuidSchema } from '@/lib/validation/common'
+import { seriesFromTransactionInput } from '@/lib/validation/recurrence'
 import { transactionSchema } from '@/lib/validation/transaction'
 import {
   deletionSnapshotSchema,
@@ -28,6 +31,14 @@ export async function createTransaction(input: unknown): Promise<ActionResult<{ 
   if (!user || !household) return { ok: false, error: translateError({ message: 'NOT_AUTHENTICATED' }) }
 
   const supabase = await createClient()
+  const series = seriesFromTransactionInput(parsed.data)
+  if (series) {
+    const created = await insertSeries(supabase, household.id, series, parsed.data.status, todayISO())
+    if (!created.ok) return created
+    await supabase.from('profiles').update({ last_account_id: parsed.data.accountId, last_credit_card_id: null }).eq('user_id', user.id)
+    done()
+    return { ok: true, data: { id: created.data.id } }
+  }
   const { data, error } = await supabase.from('transactions').insert(inputToRow(parsed.data, household.id)).select('id').single()
   if (error) return { ok: false, error: translateError(error) }
 

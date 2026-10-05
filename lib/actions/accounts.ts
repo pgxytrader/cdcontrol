@@ -2,8 +2,10 @@
 
 import { revalidatePath } from 'next/cache'
 import { invalidInput, type ActionResult } from '@/lib/action-result'
+import { todayISO } from '@/lib/dates'
 import { getCurrentHousehold } from '@/lib/household'
-import { GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
+import { hasActiveRecurrence } from '@/lib/recurrence-server'
+import { ARCHIVE_BLOCKED, GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
 import { createClient } from '@/lib/supabase/server'
 import { accountSchema, type AccountOutput } from '@/lib/validation/account'
 import { uuidSchema } from '@/lib/validation/common'
@@ -62,6 +64,15 @@ export async function setAccountArchived(id: unknown, archived: boolean): Promis
   if (!parsedId.success) return { ok: false, error: GENERIC_ERROR }
 
   const supabase = await createClient()
+  if (archived) {
+    const today = todayISO()
+    const [asSource, asDestination] = await Promise.all([
+      hasActiveRecurrence(supabase, 'account_id', parsedId.data, today),
+      hasActiveRecurrence(supabase, 'destination_account_id', parsedId.data, today),
+    ])
+    if (asSource === null || asDestination === null) return { ok: false, error: GENERIC_ERROR }
+    if (asSource || asDestination) return { ok: false, error: ARCHIVE_BLOCKED.account }
+  }
   const { data, error } = await supabase.from('accounts').update({ archived }).eq('id', parsedId.data).select('id')
   if (error) return { ok: false, error: translateError(error) }
   if (data.length === 0) return { ok: false, error: GENERIC_ERROR }

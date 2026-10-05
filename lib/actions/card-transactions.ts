@@ -4,15 +4,18 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { invalidInput, type ActionResult } from '@/lib/action-result'
 import { getCurrentUser } from '@/lib/auth'
+import { loadSchedule, loadStoredCycles, type SupabaseServer } from '@/lib/card-context'
 import { ensureInvoiceArgs, purchaseRpcArgs } from '@/lib/card-rpc'
 import { todayISO } from '@/lib/dates'
 import { buildCardPurchase } from '@/lib/finance/installments'
 import { resolveCycleForDate } from '@/lib/finance/invoice'
 import { defaultStatus } from '@/lib/finance/status'
-import type { CardSchedule, InvoiceCycle } from '@/lib/finance/types'
+import { getCurrentHousehold } from '@/lib/household'
+import { insertSeries } from '@/lib/recurrence-server'
 import { GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
 import { createClient } from '@/lib/supabase/server'
 import { uuidSchema } from '@/lib/validation/common'
+import { seriesFromCardInput } from '@/lib/validation/recurrence'
 import { cardTransactionSchema, INSTALLMENT_SCOPES, installmentEditSchema, toCardPurchaseInput } from '@/lib/validation/transaction'
 import {
   PLAN_RECORD_COLUMNS,
@@ -22,32 +25,10 @@ import {
   type TransactionRecord,
 } from '@/lib/validation/transaction-record'
 
-type SupabaseServer = Awaited<ReturnType<typeof createClient>>
-
 const scopeSchema = z.enum(INSTALLMENT_SCOPES)
 
 function done() {
   revalidatePath('/', 'layout')
-}
-
-async function loadSchedule(supabase: SupabaseServer, cardId: string): Promise<CardSchedule | null> {
-  const { data } = await supabase.from('credit_cards').select('closing_day, due_day').eq('id', cardId).maybeSingle()
-  return data ? { closingDay: data.closing_day, dueDay: data.due_day } : null
-}
-
-/** Faturas já salvas do cartão: o fechamento salvo vence o calculado (resolveCycleForDate). */
-async function loadStoredCycles(supabase: SupabaseServer, cardId: string): Promise<InvoiceCycle[] | null> {
-  const { data, error } = await supabase
-    .from('card_invoices')
-    .select('closing_month, closing_date, due_date, reference_month')
-    .eq('credit_card_id', cardId)
-  if (error) return null
-  return data.map((row) => ({
-    closingMonth: row.closing_month,
-    closingDate: row.closing_date,
-    dueDate: row.due_date,
-    referenceMonth: row.reference_month,
-  }))
 }
 
 async function loadInstallment(supabase: SupabaseServer, id: string) {
@@ -65,6 +46,16 @@ export async function createCardTransaction(input: unknown): Promise<ActionResul
   if (!user) return { ok: false, error: translateError({ message: 'NOT_AUTHENTICATED' }) }
 
   const supabase = await createClient()
+  const series = seriesFromCardInput(parsed.data)
+  if (series) {
+    const household = await getCurrentHousehold()
+    if (!household) return { ok: false, error: translateError({ message: 'NO_HOUSEHOLD' }) }
+    const created = await insertSeries(supabase, household.id, series, 'pending', todayISO())
+    if (!created.ok) return created
+    await supabase.from('profiles').update({ last_credit_card_id: parsed.data.creditCardId, last_account_id: null }).eq('user_id', user.id)
+    done()
+    return { ok: true, data: { ids: [] } }
+  }
   const schedule = await loadSchedule(supabase, parsed.data.creditCardId)
   if (!schedule) return { ok: false, error: translateError({ message: 'INVALID_CARD' }) }
 

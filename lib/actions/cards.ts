@@ -8,7 +8,8 @@ import { fetchAllPages } from '@/lib/fetch-all'
 import { rescheduleCard } from '@/lib/finance/card'
 import type { CardSchedule } from '@/lib/finance/types'
 import { getCurrentHousehold } from '@/lib/household'
-import { CARD_IN_USE, GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
+import { hasActiveRecurrence } from '@/lib/recurrence-server'
+import { ARCHIVE_BLOCKED, CARD_IN_USE, GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
 import { createClient } from '@/lib/supabase/server'
 import { cardSchema, type CardOutput } from '@/lib/validation/card'
 import { uuidSchema } from '@/lib/validation/common'
@@ -144,6 +145,11 @@ export async function setCardArchived(id: unknown, archived: boolean): Promise<A
   if (!parsedId.success) return { ok: false, error: GENERIC_ERROR }
 
   const supabase = await createClient()
+  if (archived) {
+    const active = await hasActiveRecurrence(supabase, 'credit_card_id', parsedId.data, todayISO())
+    if (active === null) return { ok: false, error: GENERIC_ERROR }
+    if (active) return { ok: false, error: ARCHIVE_BLOCKED.card }
+  }
   const { data, error } = await supabase.from('credit_cards').update({ archived }).eq('id', parsedId.data).select('id')
   if (error) return { ok: false, error: translateError(error) }
   if (data.length === 0) return { ok: false, error: GENERIC_ERROR }

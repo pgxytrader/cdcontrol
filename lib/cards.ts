@@ -86,8 +86,29 @@ async function loadInvoiceTotals(supabase: SupabaseServer, cardId?: string): Pro
   }))
 }
 
+/** Por cartão, a soma das despesas de recorrência com data futura: só ocupam o limite quando a data chega. */
+async function loadFutureRecurring(supabase: SupabaseServer, today: string, cardId?: string): Promise<Map<string, number>> {
+  const rows = await fetchAllPages((from, to) => {
+    let query = supabase
+      .from('transactions')
+      .select('id, credit_card_id, amount_cents')
+      .not('recurrence_id', 'is', null)
+      .not('credit_card_id', 'is', null)
+      .eq('type', 'expense')
+      .gt('date', today)
+    if (cardId) query = query.eq('credit_card_id', cardId)
+    return query.order('id').range(from, to)
+  })
+  const totals = new Map<string, number>()
+  for (const row of rows) {
+    const id = row.credit_card_id as string
+    totals.set(id, (totals.get(id) ?? 0) + Number(row.amount_cents))
+  }
+  return totals
+}
+
 /** Uso do limite e a fatura do ciclo atual (vazia se ainda não existe); o fechamento salvo vence o calculado. */
-function withUsage(card: Card, invoices: InvoiceTotals[], today: string): CardWithUsage {
+function withUsage(card: Card, invoices: InvoiceTotals[], today: string, futureRecurringCents: number): CardWithUsage {
   const mine = invoices.filter((invoice) => invoice.creditCardId === card.id)
   const currentCycle = resolveCycleForDate(
     toSchedule(card),
@@ -97,7 +118,7 @@ function withUsage(card: Card, invoices: InvoiceTotals[], today: string): CardWi
   const current = mine.find((invoice) => invoice.cycle.closingMonth === currentCycle.closingMonth)
   return {
     ...card,
-    usage: cardUsage(card.limitCents, mine),
+    usage: cardUsage(card.limitCents, mine, futureRecurringCents),
     currentCycle,
     currentTotalCents: current?.totalCents ?? 0,
   }
@@ -107,21 +128,23 @@ export async function listCards({ includeArchived = false }: { includeArchived?:
   const supabase = await createClient()
   let query = supabase.from('credit_cards').select(CARD_COLUMNS).order('name')
   if (!includeArchived) query = query.eq('archived', false)
-  const [{ data, error }, invoices] = await Promise.all([query, loadInvoiceTotals(supabase)])
-  if (error) throw error
   const today = todayISO()
-  return data.map((row) => withUsage(toCard(row), invoices, today))
+  const [{ data, error }, invoices, future] = await Promise.all([query, loadInvoiceTotals(supabase), loadFutureRecurring(supabase, today)])
+  if (error) throw error
+  return data.map((row) => withUsage(toCard(row), invoices, today, future.get(row.id) ?? 0))
 }
 
 export async function getCard(id: string): Promise<{ card: CardWithUsage; invoices: InvoiceTotals[] } | null> {
   const supabase = await createClient()
-  const [{ data, error }, invoices] = await Promise.all([
+  const today = todayISO()
+  const [{ data, error }, invoices, future] = await Promise.all([
     supabase.from('credit_cards').select(CARD_COLUMNS).eq('id', id).maybeSingle(),
     loadInvoiceTotals(supabase, id),
+    loadFutureRecurring(supabase, today, id),
   ])
   if (error) throw error
   if (!data) return null
-  return { card: withUsage(toCard(data), invoices, todayISO()), invoices }
+  return { card: withUsage(toCard(data), invoices, today, future.get(id) ?? 0), invoices }
 }
 
 /** Cartões para o formulário rápido e filtros (inclui arquivados, para edição de lançamentos antigos). */

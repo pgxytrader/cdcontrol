@@ -2,8 +2,10 @@
 
 import { revalidatePath } from 'next/cache'
 import { invalidInput, type ActionResult } from '@/lib/action-result'
+import { todayISO } from '@/lib/dates'
 import { getCurrentHousehold } from '@/lib/household'
-import { GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
+import { hasActiveRecurrence } from '@/lib/recurrence-server'
+import { ARCHIVE_BLOCKED, GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
 import { createClient } from '@/lib/supabase/server'
 import { categorySchema, categoryUpdateSchema } from '@/lib/validation/category'
 import { uuidSchema } from '@/lib/validation/common'
@@ -66,6 +68,11 @@ export async function setCategoryArchived(id: unknown, archived: boolean): Promi
   if (!parsedId.success) return { ok: false, error: GENERIC_ERROR }
 
   const supabase = await createClient()
+  if (archived) {
+    const active = await hasActiveRecurrence(supabase, 'category_id', parsedId.data, todayISO())
+    if (active === null) return { ok: false, error: GENERIC_ERROR }
+    if (active) return { ok: false, error: ARCHIVE_BLOCKED.category }
+  }
   const { data, error } = await supabase.from('categories').update({ archived }).eq('id', parsedId.data).select('id')
   if (error) return { ok: false, error: translateError(error) }
   if (data.length === 0) return { ok: false, error: GENERIC_ERROR }
