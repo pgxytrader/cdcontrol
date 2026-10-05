@@ -3,9 +3,16 @@ import type { CardSchedule, InvoiceCycle } from './types'
 
 export type CardUsage = { usedCents: number; availableCents: number; ratio: number }
 
-/** Limite usado = soma dos totais − soma dos pagamentos, em todas as faturas (PRD 8.3). */
-export function cardUsage(limitCents: number, invoices: { totalCents: number; paidCents: number }[]): CardUsage {
-  const usedCents = invoices.reduce((sum, invoice) => sum + invoice.totalCents - invoice.paidCents, 0)
+/**
+ * Limite usado = soma dos totais − soma dos pagamentos, em todas as faturas (PRD 8.3),
+ * menos as recorrências do cartão com data futura: assinatura só ocupa o limite quando é cobrada (spec Fase 4).
+ */
+export function cardUsage(
+  limitCents: number,
+  invoices: { totalCents: number; paidCents: number }[],
+  futureRecurringCents = 0,
+): CardUsage {
+  const usedCents = invoices.reduce((sum, invoice) => sum + invoice.totalCents - invoice.paidCents, 0) - futureRecurringCents
   return { usedCents, availableCents: limitCents - usedCents, ratio: limitCents > 0 ? usedCents / limitCents : 0 }
 }
 

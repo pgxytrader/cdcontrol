@@ -22,6 +22,14 @@ describe('cardUsage', () => {
     expect(usageLevel(0.8)).toBe('warning')
     expect(usageLevel(1)).toBe('over')
   })
+
+  it('desconta as recorrências futuras do limite usado', () => {
+    expect(cardUsage(100_000, [{ totalCents: 30_000, paidCents: 0 }], 5_500)).toEqual({
+      usedCents: 24_500,
+      availableCents: 75_500,
+      ratio: 0.245,
+    })
+  })
 })
 
 describe('rescheduleCard', () => {
