@@ -32,17 +32,17 @@ function Rows({ points }: { points: MonthPoint[] }) {
           <li key={point.key} className="py-2">
             <p className="font-medium">{formatMonthShort(point.ym)}</p>
             <dl className="grid grid-cols-3 gap-2 text-xs tabular-nums">
-              <div>
+              <div className="min-w-0">
                 <dt className="text-muted-foreground">Receitas</dt>
-                <dd>{formatBRL(point.income.paid + point.income.pending)}</dd>
+                <dd className="[overflow-wrap:anywhere]">{formatBRL(point.income.paid + point.income.pending)}</dd>
               </div>
-              <div>
+              <div className="min-w-0">
                 <dt className="text-muted-foreground">Despesas</dt>
-                <dd>{formatBRL(point.expense.paid + point.expense.pending)}</dd>
+                <dd className="[overflow-wrap:anywhere]">{formatBRL(point.expense.paid + point.expense.pending)}</dd>
               </div>
-              <div>
+              <div className="min-w-0">
                 <dt className="text-muted-foreground">Saldo</dt>
-                <dd>{formatSignedBRL(point.balanceProjected)}</dd>
+                <dd className="[overflow-wrap:anywhere]">{formatSignedBRL(point.balanceProjected)}</dd>
               </div>
             </dl>
           </li>

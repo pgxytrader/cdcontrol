@@ -53,6 +53,8 @@ describe('csvText', () => {
     expect(csvText('+1')).toBe("'+1")
     expect(csvText('@cmd')).toBe("'@cmd")
     expect(csvText('=a;b')).toBe(`"'=a;b"`)
+    expect(csvText('\tx')).toBe("'\tx")
+    expect(csvText('\rx')).toBe('"\'\rx"')
   })
 })
 

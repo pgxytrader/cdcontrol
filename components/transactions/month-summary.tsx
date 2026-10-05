@@ -4,9 +4,9 @@ import { cn } from '@/lib/utils'
 
 export function SummaryCard({ label, value, pending, tone, className }: { label: string; value: string; pending?: string; tone: string; className?: string }) {
   return (
-    <div className={cn('rounded-xl border border-border bg-surface p-3', className)}>
+    <div className={cn('min-w-0 rounded-xl border border-border bg-surface p-3', className)}>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn('text-lg font-semibold tabular-nums', tone)}>{value}</p>
+      <p className={cn('text-base font-semibold tabular-nums break-words sm:text-lg', tone)}>{value}</p>
       {pending ? <p className="text-xs text-muted-foreground tabular-nums">{pending}</p> : null}
     </div>
   )

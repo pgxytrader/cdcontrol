@@ -140,6 +140,11 @@ describe('topSlices', () => {
     expect(slices.map((slice) => slice.key)).toEqual(['a', NO_CATEGORY])
     expect(slices[1].categoryId).toBeNull()
   })
+  it('exatamente 5 linhas positivas: 5 fatias e sem "Outras"', () => {
+    const slices = topSlices([line('a', 50), line('b', 40), line('c', 30), line('d', 20), line('e', 10)])
+    expect(slices).toHaveLength(5)
+    expect(slices.some((slice) => slice.key === 'outras')).toBe(false)
+  })
   it('mais de 5 junta o resto em "Outras"', () => {
     const slices = topSlices([line('a', 70), line('b', 60), line('c', 50), line('d', 40), line('e', 30), line('f', 20), line('g', 10)])
     expect(slices).toHaveLength(6)

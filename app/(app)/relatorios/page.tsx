@@ -10,7 +10,7 @@ import { CardSpendingTable } from '@/components/reports/card-spending-table'
 import { CategoryComparisonList } from '@/components/reports/category-comparison'
 import { MonthlyTable } from '@/components/reports/monthly-table'
 import { PeriodTabs } from '@/components/reports/period-tabs'
-import { resolveYearMonth, todayISO } from '@/lib/dates'
+import { formatYearMonthParam, resolveYearMonth, todayISO } from '@/lib/dates'
 import { parsePeriod, periodLabel } from '@/lib/finance/periods'
 import { getReports } from '@/lib/reports'
 
@@ -55,14 +55,14 @@ export default async function ReportsPage({ searchParams }: Props) {
           ) : (
             <>
               <CardSpendingChart data={data.cards} />
-              <ChartLegend items={data.cards.cards.map((card) => ({ label: card.name, color: card.color }))} />
+              <ChartLegend items={data.cards.cards.map((card) => ({ id: card.id, label: card.name, color: card.color }))} />
               <CardSpendingTable data={data.cards} />
             </>
           )}
         </Panel>
 
         <p className="text-sm">
-          <Link href="/lancamentos" className="text-primary underline-offset-4 hover:underline">
+          <Link href={`/lancamentos?mes=${formatYearMonthParam(ym)}`} className="text-primary underline-offset-4 hover:underline">
             Exportar lançamentos (CSV)
           </Link>
         </p>
