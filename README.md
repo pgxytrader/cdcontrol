@@ -20,7 +20,7 @@ Não há cadastro pelo app. Crie os usuários no painel do Supabase em **Authent
 
 No primeiro acesso, cada um informa o nome. O primeiro cria a casa e gera um código de convite em **Configurações**; o segundo entra com esse código.
 
-## Funcionalidades (até a Fase 4)
+## Funcionalidades (até a Fase 5)
 
 - **Contas** (`/contas`): corrente, poupança, carteira e investimento, com saldo inicial e data. O saldo considera só lançamentos pagos a partir dessa data. Cada conta tem extrato mensal com saldo acumulado.
 - **Categorias** (`Configurações → Categorias`): receita e despesa, um nível de subcategoria, ícone e cor. As 19 categorias padrão são criadas com a casa.
@@ -32,6 +32,9 @@ No primeiro acesso, cada um informa o nome. O primeiro cria a casa e gera um có
 - **Recorrências** (botão "+", "Repetir"): semanal, mensal ou anual, com data final opcional, em conta, transferência ou compra à vista no cartão. O app gera os lançamentos como previstos até 12 meses à frente ao ser aberto; no cartão, cada um cai na fatura certa e só ocupa o limite quando a data chega. Editar ou excluir um lançamento da série pergunta "só este" ou "este e os próximos" (os já pagos nunca mudam), com "Desfazer".
 - **Tela Recorrências** (`/recorrencias`): séries ativas com a próxima data, edição (valor, conta/cartão, frequência, próxima data, data final) e encerrar; encerradas ficam numa lista à parte.
 - **Orçamento** (`/orcamento`): limite mensal por categoria de despesa (subcategorias somam na mãe), "a partir deste mês" ou "só este mês". A barra mostra realizado e previsto; alerta "Atenção" em 80% e "Estourado" em 100%.
+- **Início** (`/inicio`): receitas, despesas e saldo do mês (realizado e previsto), saldo das contas hoje, despesas por categoria (rosca, com link para Lançamentos), receitas x despesas dos últimos 6 meses, faturas abertas e fechadas a pagar, comprometimento futuro (parcelas e assinaturas no cartão nos próximos 6 meses) e as 5 categorias mais perto do limite do orçamento.
+- **Relatórios** (`/relatorios`): despesas por categoria no período (Mês, Trimestre, Semestre, Ano ou 12 meses) comparadas com o período anterior; evolução mensal de 12 meses com saldo; gastos por cartão por mês (estornos abatem).
+- **Exportar CSV** (`/lancamentos`, botão "Exportar CSV"): baixa as linhas da tela (mês, filtros e busca) em CSV para Excel em português (`;`, vírgula decimal, acentos).
 - Contas, categorias e cartões com lançamentos não podem ser excluídos, só arquivados. Conta, cartão ou categoria usados por uma recorrência ativa só são arquivados depois de encerrar a recorrência.
 
 ## Banco de dados
