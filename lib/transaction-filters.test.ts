@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildExportHref,
   buildTransactionsHref,
   escapeLike,
   filterParams,
   hasActiveFilters,
   normalizeSearch,
   parseTransactionsQuery,
+  queryFilters,
   statusFilter,
 } from './transaction-filters'
 
@@ -104,5 +106,34 @@ describe('statusFilter', () => {
       'and(account_id.not.is.null,status.eq.pending),and(account_id.is.null,date.gt.2026-10-04)',
     )
     expect(statusFilter('paid', '2026-10-04')).toBe('and(account_id.not.is.null,status.eq.paid),and(account_id.is.null,date.lte.2026-10-04)')
+  })
+})
+
+describe('exportação', () => {
+  const UUID = '0b6f4c1e-2c3d-4e5f-8a9b-0c1d2e3f4a5b'
+  const SUB = '1b6f4c1e-2c3d-4e5f-8a9b-0c1d2e3f4a5b'
+
+  it('buildExportHref leva mês, filtros e busca', () => {
+    const query = parseTransactionsQuery({ mes: '2026-10', tipo: 'despesa', categoria: UUID, q: 'mercado' }, now)
+    expect(buildExportHref(query)).toBe(`/lancamentos/exportar?mes=2026-10&q=mercado&tipo=despesa&categoria=${UUID}`)
+  })
+
+  it('buildExportHref sem filtros', () => {
+    expect(buildExportHref(parseTransactionsQuery({ mes: '2026-09' }, now))).toBe('/lancamentos/exportar?mes=2026-09')
+  })
+
+  it('queryFilters expande a categoria-mãe nas subcategorias', () => {
+    const categories = [
+      { id: UUID, name: 'Moradia', kind: 'expense' as const, parentId: null, icon: 'house', color: '#3b82f6', isDefault: true, archived: false },
+      { id: SUB, name: 'Luz', kind: 'expense' as const, parentId: UUID, icon: 'zap', color: '#3b82f6', isDefault: false, archived: false },
+    ]
+    const query = parseTransactionsQuery({ mes: '2026-10', categoria: UUID, status: 'pago' }, now)
+    expect(queryFilters(query, categories)).toEqual({
+      type: undefined,
+      status: 'paid',
+      accountId: undefined,
+      cardId: undefined,
+      categoryIds: [UUID, SUB],
+    })
   })
 })

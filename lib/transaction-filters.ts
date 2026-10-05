@@ -1,3 +1,4 @@
+import { expandCategoryFilter, type Category } from '@/lib/categories'
 import { formatYearMonthParam, resolveYearMonth, type YearMonth } from '@/lib/dates'
 import type { TransactionStatus, TransactionType } from '@/lib/finance/types'
 import { uuidSchema } from '@/lib/validation/common'
@@ -107,4 +108,29 @@ export function escapeLike(term: string): string {
 export function statusFilter(status: TransactionStatus, today: string): string {
   const byDate = status === 'paid' ? `date.lte.${today}` : `date.gt.${today}`
   return `and(account_id.not.is.null,status.eq.${status}),and(account_id.is.null,${byDate})`
+}
+
+export type QueryFilters = {
+  type?: TransactionType
+  status?: TransactionStatus
+  accountId?: string
+  cardId?: string
+  categoryIds?: string[]
+}
+
+/** Filtros da consulta: a categoria-mãe inclui as subcategorias. Usado pela tela e pela exportação. */
+export function queryFilters(query: TransactionsQuery, categories: Category[]): QueryFilters {
+  return {
+    type: query.filters.type,
+    status: query.filters.status,
+    accountId: query.filters.accountId,
+    cardId: query.filters.cardId,
+    categoryIds: query.filters.categoryId ? expandCategoryFilter(query.filters.categoryId, categories) : undefined,
+  }
+}
+
+/** Link de download do CSV com o mesmo mês, filtros e busca da tela. */
+export function buildExportHref(query: TransactionsQuery): string {
+  const search = new URLSearchParams({ mes: formatYearMonthParam(query.ym), ...filterParams(query) })
+  return `/lancamentos/exportar?${search.toString()}`
 }
