@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { inputToRow, pickDefaultAccountId, rowToFormValues, rowToInput, rowToLedger, type TransactionRow } from './transaction-mappers'
+import {
+  applyEffectiveStatus,
+  inputToRow,
+  pickDefaultAccountId,
+  rowToFormValues,
+  rowToInput,
+  rowToLedger,
+  type TransactionRow,
+} from './transaction-mappers'
 import type { TransactionInput } from './validation/transaction'
 
 const row: TransactionRow = {
@@ -12,8 +20,14 @@ const row: TransactionRow = {
   category_id: 'cat-1',
   account_id: 'acc-1',
   destination_account_id: null,
+  credit_card_id: null,
+  invoice_id: null,
+  installment_plan_id: null,
+  installment_number: null,
   notes: null,
   created_at: '2026-10-04T12:00:00Z',
+  installment_plans: null,
+  card_invoices: null,
 }
 
 describe('mapeadores de lançamento', () => {
@@ -81,5 +95,13 @@ describe('mapeadores de lançamento', () => {
     expect(pickDefaultAccountId(accounts, 'arquivada')).toBe('a')
     expect(pickDefaultAccountId(accounts, null)).toBe('a')
     expect(pickDefaultAccountId([], 'b')).toBeNull()
+  })
+
+  it('applyEffectiveStatus: compra no cartão segue a data; em conta, o status salvo', () => {
+    const card = { ...row, account_id: null, credit_card_id: 'card-1', invoice_id: 'inv-1', status: 'pending' as const }
+    expect(applyEffectiveStatus(card, '2026-10-04').status).toBe('paid')
+    expect(applyEffectiveStatus({ ...card, date: '2026-11-04', status: 'paid' }, '2026-10-04').status).toBe('pending')
+    expect(applyEffectiveStatus({ ...row, status: 'pending' }, '2026-12-01').status).toBe('pending')
+    expect(applyEffectiveStatus(row, '2026-10-04')).toBe(row)
   })
 })

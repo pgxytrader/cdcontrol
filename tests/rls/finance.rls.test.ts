@@ -90,7 +90,7 @@ describe('finanças: contas, categorias e lançamentos', () => {
     const byId = new Map(balances!.map((row) => [row.account_id, Number(row.balance_cents)]))
 
     const { data: rows } = await a.client.from('transactions').select(TRANSACTION_COLUMNS).eq('household_id', houseA)
-    const ledger = (rows as TransactionRow[]).map(rowToLedger)
+    const ledger = (rows as unknown as TransactionRow[]).map(rowToLedger)
 
     expect(byId.get(accA)).toBe(123_000)
     expect(byId.get(accA)).toBe(accountBalance({ id: accA, initialBalanceCents: 100_000, initialBalanceDate: '2026-09-01' }, ledger))

@@ -41,8 +41,8 @@ export function TransactionList({ rows, categories, accounts, mode }: Transactio
 
   const labelFor = (row: TransactionRow) =>
     row.type === 'transfer'
-      ? `${accountName.get(row.account_id) ?? '?'} → ${accountName.get(row.destination_account_id ?? '') ?? '?'}`
-      : (accountName.get(row.account_id) ?? '?')
+      ? `${accountName.get(row.account_id ?? '') ?? '?'} → ${accountName.get(row.destination_account_id ?? '') ?? '?'}`
+      : (accountName.get(row.account_id ?? '') ?? '?')
 
   return (
     <>

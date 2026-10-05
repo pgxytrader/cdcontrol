@@ -67,6 +67,60 @@ export type Database = {
           },
         ]
       }
+      card_invoices: {
+        Row: {
+          closing_date: string
+          closing_month: string
+          created_at: string
+          created_by: string | null
+          credit_card_id: string
+          due_date: string
+          household_id: string
+          id: string
+          reference_month: string
+          updated_at: string
+        }
+        Insert: {
+          closing_date: string
+          closing_month: string
+          created_at?: string
+          created_by?: string | null
+          credit_card_id: string
+          due_date: string
+          household_id: string
+          id?: string
+          reference_month: string
+          updated_at?: string
+        }
+        Update: {
+          closing_date?: string
+          closing_month?: string
+          created_at?: string
+          created_by?: string | null
+          credit_card_id?: string
+          due_date?: string
+          household_id?: string
+          id?: string
+          reference_month?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_invoices_credit_card_id_fkey"
+            columns: ["credit_card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_invoices_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           archived: boolean
@@ -123,6 +177,79 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_cards: {
+        Row: {
+          archived: boolean
+          brand: string
+          closing_day: number
+          color: string
+          created_at: string
+          created_by: string | null
+          default_payment_account_id: string | null
+          due_day: number
+          household_id: string
+          id: string
+          last_four: string | null
+          limit_cents: number
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          archived?: boolean
+          brand: string
+          closing_day: number
+          color: string
+          created_at?: string
+          created_by?: string | null
+          default_payment_account_id?: string | null
+          due_day: number
+          household_id: string
+          id?: string
+          last_four?: string | null
+          limit_cents?: number
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          archived?: boolean
+          brand?: string
+          closing_day?: number
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          default_payment_account_id?: string | null
+          due_day?: number
+          household_id?: string
+          id?: string
+          last_four?: string | null
+          limit_cents?: number
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_cards_default_payment_account_id_fkey"
+            columns: ["default_payment_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_cards_default_payment_account_id_fkey"
+            columns: ["default_payment_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "credit_cards_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
             referencedColumns: ["id"]
           },
         ]
@@ -224,12 +351,83 @@ export type Database = {
         }
         Relationships: []
       }
+      installment_plans: {
+        Row: {
+          category_id: string
+          created_at: string
+          created_by: string | null
+          credit_card_id: string
+          description: string
+          first_closing_month: string
+          first_installment_number: number
+          household_id: string
+          id: string
+          installments_count: number
+          purchase_date: string
+          total_amount_cents: number
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          created_by?: string | null
+          credit_card_id: string
+          description: string
+          first_closing_month: string
+          first_installment_number: number
+          household_id: string
+          id?: string
+          installments_count: number
+          purchase_date: string
+          total_amount_cents: number
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          created_by?: string | null
+          credit_card_id?: string
+          description?: string
+          first_closing_month?: string
+          first_installment_number?: number
+          household_id?: string
+          id?: string
+          installments_count?: number
+          purchase_date?: string
+          total_amount_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installment_plans_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installment_plans_credit_card_id_fkey"
+            columns: ["credit_card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installment_plans_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string
           display_name: string | null
           last_account_id: string | null
+          last_credit_card_id: string | null
           updated_at: string
           user_id: string
         }
@@ -238,6 +436,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           last_account_id?: string | null
+          last_credit_card_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -246,6 +445,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           last_account_id?: string | null
+          last_credit_card_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -264,21 +464,32 @@ export type Database = {
             referencedRelation: "v_account_balances"
             referencedColumns: ["account_id"]
           },
+          {
+            foreignKeyName: "profiles_last_credit_card_id_fkey"
+            columns: ["last_credit_card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
         ]
       }
       transactions: {
         Row: {
-          account_id: string
+          account_id: string | null
           amount_cents: number
           category_id: string | null
           created_at: string
           created_by: string | null
+          credit_card_id: string | null
           date: string
           description: string
           destination_account_id: string | null
           external_id: string | null
           household_id: string
           id: string
+          installment_number: number | null
+          installment_plan_id: string | null
+          invoice_id: string | null
           notes: string | null
           source: string
           status: string
@@ -286,17 +497,21 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          account_id: string
+          account_id?: string | null
           amount_cents: number
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          credit_card_id?: string | null
           date: string
           description: string
           destination_account_id?: string | null
           external_id?: string | null
           household_id: string
           id?: string
+          installment_number?: number | null
+          installment_plan_id?: string | null
+          invoice_id?: string | null
           notes?: string | null
           source?: string
           status: string
@@ -304,17 +519,21 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          account_id?: string
+          account_id?: string | null
           amount_cents?: number
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          credit_card_id?: string | null
           date?: string
           description?: string
           destination_account_id?: string | null
           external_id?: string | null
           household_id?: string
           id?: string
+          installment_number?: number | null
+          installment_plan_id?: string | null
+          invoice_id?: string | null
           notes?: string | null
           source?: string
           status?: string
@@ -344,6 +563,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "transactions_credit_card_id_fkey"
+            columns: ["credit_card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "transactions_destination_account_id_fkey"
             columns: ["destination_account_id"]
             isOneToOne: false
@@ -363,6 +589,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "households"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_installment_plan_id_fkey"
+            columns: ["installment_plan_id"]
+            isOneToOne: false
+            referencedRelation: "installment_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "card_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "v_invoice_totals"
+            referencedColumns: ["invoice_id"]
           },
         ]
       }
@@ -384,8 +631,54 @@ export type Database = {
           },
         ]
       }
+      v_invoice_totals: {
+        Row: {
+          charges_cents: number | null
+          closing_date: string | null
+          closing_month: string | null
+          credit_card_id: string | null
+          credits_cents: number | null
+          due_date: string | null
+          household_id: string | null
+          invoice_id: string | null
+          paid_cents: number | null
+          reference_month: string | null
+          total_cents: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_invoices_credit_card_id_fkey"
+            columns: ["credit_card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_invoices_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      apply_card_schedule: {
+        Args: {
+          p_card_id: string
+          p_closing_day: number
+          p_due_day: number
+          p_invoices: Json
+          p_moves: Json
+          p_plans: Json
+        }
+        Returns: undefined
+      }
+      create_card_purchase: {
+        Args: { p_card_id: string; p_plan: Json; p_rows: Json }
+        Returns: string[]
+      }
       create_household: { Args: { p_name: string }; Returns: string }
       create_invite: {
         Args: never
@@ -394,8 +687,22 @@ export type Database = {
           expires_at: string
         }[]
       }
+      ensure_invoice: {
+        Args: {
+          p_card_id: string
+          p_closing_date: string
+          p_closing_month: string
+          p_due_date: string
+          p_reference_month: string
+        }
+        Returns: string
+      }
       is_household_member: { Args: { hid: string }; Returns: boolean }
       redeem_invite: { Args: { p_code: string }; Returns: string }
+      restore_transactions: {
+        Args: { p_plan: Json; p_rows: Json }
+        Returns: undefined
+      }
       seed_default_categories: {
         Args: { p_household_id: string }
         Returns: undefined

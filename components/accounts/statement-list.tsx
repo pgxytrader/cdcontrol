@@ -47,7 +47,7 @@ export function StatementList({ statement, categories, accountNames, initialBala
             const subtitle = [
               formatISODateBR(row.date),
               isTransfer
-                ? `${accountNames.get(row.account_id) ?? '?'} → ${accountNames.get(row.destination_account_id ?? '') ?? '?'}`
+                ? `${accountNames.get(row.account_id ?? '') ?? '?'} → ${accountNames.get(row.destination_account_id ?? '') ?? '?'}`
                 : category?.name,
               note,
             ]
