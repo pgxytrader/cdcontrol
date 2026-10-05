@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { EmptyText } from '@/components/dashboard/panel'
 import { PageHeader } from '@/components/layout/page-header'
+import { ExpenseFormButton } from '@/components/property/expense-form'
+import { ExpensesTab } from '@/components/property/expenses-tab'
 import { PropertyFormButton } from '@/components/property/property-form'
 import { PropertyHeader } from '@/components/property/property-header'
 import { PropertyTabs } from '@/components/property/property-tabs'
@@ -8,7 +10,7 @@ import { SummaryTab } from '@/components/property/summary-tab'
 import { todayISO } from '@/lib/dates'
 import { expenseStatus, propertySummary } from '@/lib/finance/property'
 import { listExpenseTypes, listProperties, listPropertyExpenses } from '@/lib/property'
-import { parsePropertyQuery, type PropertyQuery } from '@/lib/property-filters'
+import { filterExpenses, parsePropertyQuery, type PropertyQuery } from '@/lib/property-filters'
 
 export const metadata: Metadata = { title: 'Imóvel' }
 
@@ -47,6 +49,7 @@ export default async function PropertyPage({ searchParams }: Props) {
         query={current}
         actions={
           <>
+            <ExpenseFormButton propertyId={property.id} types={types} today={today} />
             <PropertyFormButton label="Editar imóvel" property={property} counts={counts} />
             <PropertyFormButton label="Novo imóvel" variant="ghost" />
           </>
@@ -59,6 +62,15 @@ export default async function PropertyPage({ searchParams }: Props) {
           summary={summary}
           nextStatus={summary.next ? expenseStatus(summary.next, today) : null}
           typeName={(id) => typeName.get(id) ?? 'Tipo removido'}
+        />
+      ) : current.tab === 'gastos' ? (
+        <ExpensesTab
+          propertyId={property.id}
+          expenses={filterExpenses(expenses, current.filters, today)}
+          types={types}
+          query={current}
+          today={today}
+          openExpense={current.expenseId ? (expenses.find((expense) => expense.id === current.expenseId) ?? null) : null}
         />
       ) : (
         <EmptyText>Esta seção chega nas próximas etapas.</EmptyText>
