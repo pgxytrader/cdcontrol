@@ -59,7 +59,7 @@ export function TransactionList({ rows, categories, accounts, mode }: Transactio
                       <TransactionItem
                         row={row}
                         category={row.category_id ? categoryById.get(row.category_id) : undefined}
-                        accountLabel={labelFor(row)}
+                        sourceLabel={labelFor(row)}
                         onClick={() => setEditing(row)}
                       />
                     </li>

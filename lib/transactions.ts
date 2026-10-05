@@ -70,3 +70,19 @@ export async function searchTransactions(q: string, filters: TransactionQueryFil
   if (error) throw error
   return data as TransactionRow[]
 }
+
+/** Lançamentos de uma fatura (compras, parcelas, estornos e pagamentos), em ordem cronológica. */
+export async function listInvoiceTransactions(invoiceId: string): Promise<TransactionRow[]> {
+  const supabase = await createClient()
+  const rows = await fetchAllPages((from, to) =>
+    supabase
+      .from('transactions')
+      .select(TRANSACTION_COLUMNS)
+      .eq('invoice_id', invoiceId)
+      .order('date')
+      .order('created_at')
+      .order('id')
+      .range(from, to),
+  )
+  return rows as TransactionRow[]
+}
