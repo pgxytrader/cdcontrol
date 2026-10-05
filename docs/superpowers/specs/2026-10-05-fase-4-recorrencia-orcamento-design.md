@@ -48,7 +48,7 @@ Migration nova em `supabase/migrations/`. Tabelas novas seguem o padrão das fas
   - `transfer`: `category_id` e `credit_card_id` nulos; `account_id` e `destination_account_id` não nulos e diferentes.
 - Trigger `recurrences_check_refs` (security definer, `search_path = ''`): conta, conta destino, cartão e categoria da mesma casa (`INVALID_ACCOUNT`, `INVALID_CARD`, `INVALID_CATEGORY`) e `kind` da categoria igual ao `type` (`CATEGORY_KIND_MISMATCH`).
 - Índices: `(household_id)`, `(account_id)`, `(destination_account_id)`, `(credit_card_id)`, `(category_id)`.
-- **Ativa** = `end_date` nula ou `end_date >= hoje`.
+- **Ativa** = `end_date` nula ou `end_date` depois de hoje (encerrar hoje já tira a série das ativas).
 
 ### 1.2 `transactions` (alterações)
 

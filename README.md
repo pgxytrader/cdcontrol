@@ -20,7 +20,7 @@ Não há cadastro pelo app. Crie os usuários no painel do Supabase em **Authent
 
 No primeiro acesso, cada um informa o nome. O primeiro cria a casa e gera um código de convite em **Configurações**; o segundo entra com esse código.
 
-## Funcionalidades (até a Fase 3)
+## Funcionalidades (até a Fase 4)
 
 - **Contas** (`/contas`): corrente, poupança, carteira e investimento, com saldo inicial e data. O saldo considera só lançamentos pagos a partir dessa data. Cada conta tem extrato mensal com saldo acumulado.
 - **Categorias** (`Configurações → Categorias`): receita e despesa, um nível de subcategoria, ícone e cor. As 19 categorias padrão são criadas com a casa.
@@ -29,7 +29,10 @@ No primeiro acesso, cada um informa o nome. O primeiro cria a casa e gera um có
 - **Faturas** (`/cartoes/[id]`): criadas automaticamente pelo mês de fechamento (compra no dia do fechamento vai para a seguinte); status calculado (aberta, fechada, paga, vencida). Pagamento total ou parcial a partir de uma conta: sai do saldo, mas não é despesa. Estorno é uma receita no cartão e abate o total.
 - **Compras parceladas** (botão "+", "Pagar com" um cartão): 1 a 24 parcelas, com o resto dos centavos na primeira; compra já em andamento ("parcela 3 de 10"); editar ou excluir "só esta parcela" ou "esta e as futuras", com "Desfazer".
 - **Parcelas** (`/parcelas`): todas as parcelas futuras de todos os cartões por mês de vencimento, com total por mês e por cartão.
-- Contas, categorias e cartões com lançamentos não podem ser excluídos, só arquivados.
+- **Recorrências** (botão "+", "Repetir"): semanal, mensal ou anual, com data final opcional, em conta, transferência ou compra à vista no cartão. O app gera os lançamentos como previstos até 12 meses à frente ao ser aberto; no cartão, cada um cai na fatura certa e só ocupa o limite quando a data chega. Editar ou excluir um lançamento da série pergunta "só este" ou "este e os próximos" (os já pagos nunca mudam), com "Desfazer".
+- **Tela Recorrências** (`/recorrencias`): séries ativas com a próxima data, edição (valor, conta/cartão, frequência, próxima data, data final) e encerrar; encerradas ficam numa lista à parte.
+- **Orçamento** (`/orcamento`): limite mensal por categoria de despesa (subcategorias somam na mãe), "a partir deste mês" ou "só este mês". A barra mostra realizado e previsto; alerta "Atenção" em 80% e "Estourado" em 100%.
+- Contas, categorias e cartões com lançamentos não podem ser excluídos, só arquivados. Conta, cartão ou categoria usados por uma recorrência ativa só são arquivados depois de encerrar a recorrência.
 
 ## Banco de dados
 
