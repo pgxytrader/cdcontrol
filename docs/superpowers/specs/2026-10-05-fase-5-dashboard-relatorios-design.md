@@ -55,7 +55,7 @@ Entrada: linhas mínimas `{ type, status, date, amountCents, categoryId, account
 
 ### 2.4 `lib/finance/csv.ts`
 
-- `transactionsCsv(rows, lookups)` → string com BOM (`﻿`), separador `;`, quebra de linha `\r\n`.
+- `transactionsCsv(rows, lookups)` → string com BOM (`\uFEFF`), separador `;`, quebra de linha `\r\n`.
 - Cabeçalho: `Data;Descrição;Tipo;Categoria;Conta/Cartão;Status;Valor`.
 - Data `dd/mm/aaaa`; tipo "Receita", "Despesa", "Transferência", "Pagamento de fatura"; categoria "Mãe › Sub" para subcategoria; conta/cartão pelo nome ("Itaú → Nubank" em transferência; pagamento de fatura "Itaú → Cartão Nubank"); status "Pago"/"Pendente" (efetivo); valor com vírgula decimal e sem separador de milhar; despesa negativa (`-1234,56`), receita (inclusive estorno no cartão) positiva, transferência e pagamento de fatura sem sinal.
 - Descrição de parcela como na tela ("Geladeira (3/10)").
