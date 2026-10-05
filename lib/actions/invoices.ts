@@ -2,8 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { invalidInput, type ActionResult } from '@/lib/action-result'
-import { todayISO } from '@/lib/dates'
-import { defaultStatus } from '@/lib/finance/status'
 import { getCurrentHousehold } from '@/lib/household'
 import { paymentDescription } from '@/lib/invoice-labels'
 import { GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
@@ -42,7 +40,7 @@ export async function payInvoice(invoiceId: unknown, input: unknown): Promise<Ac
       description: paymentDescription(invoice.credit_cards?.name ?? 'cartão', invoice.reference_month),
       amount_cents: parsed.data.amountCents,
       date: parsed.data.date,
-      status: defaultStatus(parsed.data.date, todayISO()),
+      status: parsed.data.status,
       account_id: parsed.data.accountId,
       credit_card_id: invoice.credit_card_id,
       invoice_id: invoice.id,
@@ -68,7 +66,7 @@ export async function updateInvoicePayment(id: unknown, input: unknown): Promise
       account_id: parsed.data.accountId,
       amount_cents: parsed.data.amountCents,
       date: parsed.data.date,
-      status: defaultStatus(parsed.data.date, todayISO()),
+      status: parsed.data.status,
     })
     .eq('id', parsedId.data)
     .eq('type', 'invoice_payment')

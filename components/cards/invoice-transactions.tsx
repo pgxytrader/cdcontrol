@@ -98,6 +98,7 @@ export function InvoiceTransactions({
                   accountId: editingPayment.account_id ?? '',
                   amountCents: editingPayment.amount_cents,
                   date: editingPayment.date,
+                  status: editingPayment.status,
                 }
               : undefined
           }

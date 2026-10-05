@@ -11,6 +11,7 @@ export const invoicePaymentSchema = z.object({
     .positive({ error: 'Informe um valor maior que zero.' })
     .max(MAX_CENTS, { error: 'Valor muito alto.' }),
   date: isoDateSchema,
+  status: z.enum(['paid', 'pending'], { error: 'Escolha o status.' }),
 })
 
 export type InvoicePaymentInput = z.output<typeof invoicePaymentSchema>
