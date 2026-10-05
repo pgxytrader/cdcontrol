@@ -136,3 +136,125 @@ export function describeSchedule(schedule: RecurrenceSchedule): string {
   else base = `Todo ano em ${formatISODateBR(schedule.startDate).slice(0, 5)}`
   return `${base}, ${schedule.endDate ? `até ${formatISODateBR(schedule.endDate)}` : 'sem data final'}`
 }
+
+export type SeriesState = Series & { id: string; generatedUntil: string }
+
+/** `card` é o cartão dos valores novos (null quando a série fica em conta). */
+export type ChangeContext = { transactions: SeriesTransaction[]; today: string; card: CardContext | null }
+
+/** Estado completo da série depois da mudança, o que apagar e o que gravar. */
+export type SeriesChange = { series: Series; deleteIds: string[]; occurrences: Occurrence[]; generatedUntil: string }
+
+export type OccurrenceValues = SeriesFields & { date: string; status: TransactionStatus }
+
+export type SeriesEditValues = SeriesFields & { frequency: RecurrenceFrequency; nextDate: string; endDate: string | null }
+
+function seriesOf(state: SeriesState): Series {
+  return {
+    type: state.type,
+    description: state.description,
+    amountCents: state.amountCents,
+    categoryId: state.categoryId,
+    accountId: state.accountId,
+    destinationAccountId: state.destinationAccountId,
+    creditCardId: state.creditCardId,
+    notes: state.notes,
+    frequency: state.frequency,
+    startDate: state.startDate,
+    endDate: state.endDate,
+  }
+}
+
+function fieldsOf(values: SeriesFields): SeriesFields {
+  return {
+    type: values.type,
+    description: values.description,
+    amountCents: values.amountCents,
+    categoryId: values.categoryId,
+    accountId: values.accountId,
+    destinationAccountId: values.destinationAccountId,
+    creditCardId: values.creditCardId,
+    notes: values.notes,
+  }
+}
+
+const earlier = (a: string, b: string) => (a < b ? a : b)
+
+/** Ocorrências de `from` até onde a série deve estar gerada. */
+function regenerate(series: Series, from: string, ctx: ChangeContext): { occurrences: Occurrence[]; generatedUntil: string } {
+  const generatedUntil = untilFor(series.endDate, ctx.today)
+  const dates = from <= generatedUntil ? occurrenceDates(series, from, generatedUntil) : []
+  return { occurrences: buildOccurrences(dates, ctx.card, ctx.today), generatedUntil }
+}
+
+/** Série nova: a primeira ocorrência é o lançamento salvo no formulário. */
+export function createSeries(
+  series: Series,
+  firstStatus: TransactionStatus,
+  card: CardContext | null,
+  today: string,
+): { occurrences: Occurrence[]; generatedUntil: string } {
+  const until = untilFor(series.endDate, today)
+  // Série que começa depois do horizonte: grava só a primeira
+  const generatedUntil = until < series.startDate ? series.startDate : until
+  const occurrences = buildOccurrences(occurrenceDates(series, series.startDate, generatedUntil), card, today)
+  if (!card && occurrences.length > 0) occurrences[0] = { ...occurrences[0], status: firstStatus }
+  return { occurrences, generatedUntil }
+}
+
+/** "Editar este e os próximos": regrava este lançamento (mesmo id) e troca as não realizadas seguintes. */
+export function changeFollowing(
+  current: SeriesState,
+  occurrence: SeriesTransaction,
+  values: OccurrenceValues,
+  ctx: ChangeContext,
+): SeriesChange {
+  const anchorChanged = values.date !== occurrence.date
+  const startDate = anchorChanged ? values.date : current.startDate
+  const endDate = current.endDate !== null && current.endDate < startDate ? startDate : current.endDate
+  const series: Series = { ...fieldsOf(values), frequency: current.frequency, startDate, endDate }
+  const occurrenceDate = anchorChanged ? values.date : occurrence.occurrenceDate
+
+  const others = ctx.transactions.filter((tx) => tx.id !== occurrence.id)
+  const deleteIds = [occurrence.id, ...occurrencesToReplace(others, addDaysISO(occurrence.occurrenceDate, 1), ctx.today)]
+
+  const [rewritten] = buildOccurrences([values.date], ctx.card, ctx.today)
+  const self: Occurrence = { ...rewritten, id: occurrence.id, occurrenceDate, status: ctx.card ? rewritten.status : values.status }
+  const rest = regenerate(series, addDaysISO(occurrenceDate, 1), ctx)
+  return { series, deleteIds, occurrences: [self, ...rest.occurrences], generatedUntil: rest.generatedUntil }
+}
+
+/** "Excluir este e os próximos": a série termina no dia anterior; este sai mesmo se já pago. */
+export function removeFollowing(current: SeriesState, occurrence: SeriesTransaction, ctx: ChangeContext): SeriesChange {
+  const endDate = addDaysISO(occurrence.occurrenceDate, -1)
+  const others = ctx.transactions.filter((tx) => tx.id !== occurrence.id)
+  return {
+    series: { ...seriesOf(current), endDate },
+    deleteIds: [occurrence.id, ...occurrencesToReplace(others, addDaysISO(occurrence.occurrenceDate, 1), ctx.today)],
+    occurrences: [],
+    generatedUntil: earlier(endDate, current.generatedUntil),
+  }
+}
+
+/** Edição pela tela Recorrências: troca as não realizadas de hoje em diante. */
+export function changeSeries(current: SeriesState, values: SeriesEditValues, ctx: ChangeContext): SeriesChange {
+  const anchorChanged = values.frequency !== current.frequency || values.nextDate !== nextOccurrenceDate(ctx.transactions, ctx.today)
+  const series: Series = {
+    ...fieldsOf(values),
+    frequency: values.frequency,
+    startDate: anchorChanged ? values.nextDate : current.startDate,
+    endDate: values.endDate,
+  }
+  const deleteIds = occurrencesToReplace(ctx.transactions, ctx.today, ctx.today)
+  return { series, deleteIds, ...regenerate(series, ctx.today, ctx) }
+}
+
+/** Encerrar: a série termina hoje e as não realizadas depois de hoje saem. */
+export function endSeries(current: SeriesState, ctx: ChangeContext): SeriesChange {
+  return {
+    series: { ...seriesOf(current), endDate: ctx.today },
+    deleteIds: occurrencesToReplace(ctx.transactions, addDaysISO(ctx.today, 1), ctx.today),
+    occurrences: [],
+    generatedUntil: earlier(ctx.today, current.generatedUntil),
+  }
+}
