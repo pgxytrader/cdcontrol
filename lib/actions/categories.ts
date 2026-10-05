@@ -69,7 +69,11 @@ export async function setCategoryArchived(id: unknown, archived: boolean): Promi
 
   const supabase = await createClient()
   if (archived) {
-    const active = await hasActiveRecurrence(supabase, 'category_id', parsedId.data, todayISO())
+    // Arquivar uma categoria de primeiro nível também esconde as subcategorias: confere todas
+    const { data: children, error: childrenError } = await supabase.from('categories').select('id').eq('parent_id', parsedId.data)
+    if (childrenError) return { ok: false, error: GENERIC_ERROR }
+    const ids = [parsedId.data, ...children.map((child) => child.id)]
+    const active = await hasActiveRecurrence(supabase, 'category_id', ids, todayISO())
     if (active === null) return { ok: false, error: GENERIC_ERROR }
     if (active) return { ok: false, error: ARCHIVE_BLOCKED.category }
   }

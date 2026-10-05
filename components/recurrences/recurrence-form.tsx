@@ -151,7 +151,7 @@ export function RecurrenceForm({ item, onDone }: { item: RecurrenceItem; onDone:
               ])}
             </NativeSelect>
           </Field>
-          <Field id="rec-source" label="Pagar com" error={errors.accountId?.message}>
+          <Field id="rec-source" label={item.type === 'income' ? 'Receber em' : 'Pagar com'} error={errors.accountId?.message}>
             <NativeSelect
               id="rec-source"
               value={encodeSource({ accountId, creditCardId })}

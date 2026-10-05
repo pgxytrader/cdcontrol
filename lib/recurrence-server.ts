@@ -60,7 +60,8 @@ export async function loadSeriesTransactions(supabase: SupabaseServer, recurrenc
       supabase.from('transactions').select(SERIES_TRANSACTION_COLUMNS).eq('recurrence_id', recurrenceId).order('id').range(from, to),
     )
     return (rows as SeriesTransactionRow[]).map(toSeriesTransaction)
-  } catch {
+  } catch (error) {
+    console.error('loadSeriesTransactions', error)
     return null
   }
 }
@@ -107,17 +108,17 @@ export async function insertSeries(
   return { ok: true, data: { id: data as string } }
 }
 
-/** Há recorrência ativa (sem fim ou terminando depois de hoje) usando o item? Null se a consulta falhar. */
+/** Há recorrência ativa (sem fim ou terminando depois de hoje) usando o item (ou algum dos itens)? Null se a consulta falhar. */
 export async function hasActiveRecurrence(
   supabase: SupabaseServer,
   column: 'account_id' | 'destination_account_id' | 'credit_card_id' | 'category_id',
-  id: string,
+  ids: string | string[],
   today: string,
 ): Promise<boolean | null> {
   const { count, error } = await supabase
     .from('recurrences')
     .select('id', { count: 'exact', head: true })
-    .eq(column, id)
+    .in(column, typeof ids === 'string' ? [ids] : ids)
     .or(`end_date.is.null,end_date.gt.${today}`)
   if (error) return null
   return (count ?? 0) > 0
