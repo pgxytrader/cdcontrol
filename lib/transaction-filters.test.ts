@@ -11,6 +11,7 @@ import {
 const now = new Date('2026-10-15T12:00:00Z')
 const ACC = '11111111-1111-4111-8111-111111111111'
 const CAT = '33333333-3333-4333-8333-333333333333'
+const CARD = '44444444-4444-4444-8444-444444444444'
 
 describe('parseTransactionsQuery', () => {
   it('sem parâmetros usa o mês atual e nenhum filtro', () => {
@@ -78,5 +79,20 @@ describe('escapeLike', () => {
   it('escapa curingas e a barra', () => {
     expect(escapeLike('50%_off\\')).toBe('50\\%\\_off\\\\')
     expect(escapeLike('padaria')).toBe('padaria')
+  })
+})
+
+describe('filtros da Fase 3', () => {
+  it('lê cartão e pagamento de fatura; ignora valores adulterados', () => {
+    expect(parseTransactionsQuery({ cartao: CARD, tipo: 'pagamento-fatura' }, now).filters).toEqual({
+      cardId: CARD,
+      type: 'invoice_payment',
+    })
+    expect(parseTransactionsQuery({ cartao: 'nao-uuid', tipo: 'constructor' }, now).filters).toEqual({})
+  })
+
+  it('filterParams preserva o cartão', () => {
+    const query = parseTransactionsQuery({ cartao: CARD, tipo: 'pagamento-fatura' }, now)
+    expect(filterParams(query)).toEqual({ tipo: 'pagamento-fatura', cartao: CARD })
   })
 })

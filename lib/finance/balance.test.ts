@@ -104,3 +104,16 @@ describe('buildStatement', () => {
     expect(statement.rows[0].transaction.description).toBe('Padaria')
   })
 })
+
+describe('pagamento de fatura e lançamentos no cartão', () => {
+  it('pagamento de fatura sai da conta; compra no cartão não mexe em conta', () => {
+    expect(transactionDelta(tx({ type: 'invoice_payment', amountCents: 3000 }), 'a1')).toBe(-3000)
+    expect(transactionDelta(tx({ type: 'expense', accountId: null }), 'a1')).toBe(0)
+    expect(
+      accountBalance(account, [
+        tx({ type: 'invoice_payment', amountCents: 3000 }),
+        tx({ type: 'expense', amountCents: 9000, accountId: null }),
+      ]),
+    ).toBe(97_000)
+  })
+})

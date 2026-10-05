@@ -6,6 +6,7 @@ import {
   daysInMonth,
   invoiceStatus,
   shiftClosingMonth,
+  summarizeInvoice,
 } from './invoice'
 
 const card = { closingDay: 3, dueDay: 10 }
@@ -111,5 +112,19 @@ describe('invoiceStatus (PRD 8.4)', () => {
 
   it('estorno maior que as compras: fatura fechada já está paga', () => {
     expect(invoiceStatus(dates, { totalCents: -500, paidCents: 0 }, '2026-11-05')).toBe('paid')
+  })
+})
+
+describe('summarizeInvoice', () => {
+  it('compras − estornos; só pagamentos pagos contam como pago', () => {
+    expect(
+      summarizeInvoice([
+        { type: 'expense', status: 'paid', amountCents: 3334 },
+        { type: 'expense', status: 'pending', amountCents: 1000 },
+        { type: 'income', status: 'paid', amountCents: 500 },
+        { type: 'invoice_payment', status: 'paid', amountCents: 2000 },
+        { type: 'invoice_payment', status: 'pending', amountCents: 999 },
+      ]),
+    ).toEqual({ chargesCents: 4334, creditsCents: 500, totalCents: 3834, paidCents: 2000 })
   })
 })

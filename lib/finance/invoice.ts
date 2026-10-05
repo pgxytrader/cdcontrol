@@ -1,5 +1,5 @@
 import { formatYearMonthParam, shiftYearMonth, yearMonthOfISO, type YearMonth } from '@/lib/dates'
-import type { CardSchedule, InvoiceCycle } from './types'
+import type { CardSchedule, InvoiceCycle, LedgerTransaction } from './types'
 
 const pad = (value: number) => String(value).padStart(2, '0')
 
@@ -65,4 +65,19 @@ export function invoiceStatus(
   if (amounts.paidCents >= amounts.totalCents) return 'paid'
   if (today > dates.dueDate) return 'overdue'
   return 'closed'
+}
+
+export type InvoiceAmounts = { chargesCents: number; creditsCents: number; totalCents: number; paidCents: number }
+
+/** Mesma regra da view v_invoice_totals: compras − estornos; pago = pagamentos com status pago. */
+export function summarizeInvoice(transactions: Pick<LedgerTransaction, 'type' | 'status' | 'amountCents'>[]): InvoiceAmounts {
+  let chargesCents = 0
+  let creditsCents = 0
+  let paidCents = 0
+  for (const tx of transactions) {
+    if (tx.type === 'expense') chargesCents += tx.amountCents
+    else if (tx.type === 'income') creditsCents += tx.amountCents
+    else if (tx.type === 'invoice_payment' && tx.status === 'paid') paidCents += tx.amountCents
+  }
+  return { chargesCents, creditsCents, totalCents: chargesCents - creditsCents, paidCents }
 }

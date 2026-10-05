@@ -4,7 +4,8 @@ import type { LedgerAccount, LedgerTransaction } from './types'
 /** Efeito do lançamento no saldo da conta (0 se não a envolve). */
 export function transactionDelta(tx: LedgerTransaction, accountId: string): number {
   if (tx.type === 'income') return tx.accountId === accountId ? tx.amountCents : 0
-  if (tx.type === 'expense') return tx.accountId === accountId ? -tx.amountCents : 0
+  // Pagamento de fatura sai da conta como uma despesa, mas não é despesa no resumo (PRD 8.5)
+  if (tx.type === 'expense' || tx.type === 'invoice_payment') return tx.accountId === accountId ? -tx.amountCents : 0
   let delta = 0
   if (tx.accountId === accountId) delta -= tx.amountCents
   if (tx.destinationAccountId === accountId) delta += tx.amountCents

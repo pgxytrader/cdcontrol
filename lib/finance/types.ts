@@ -1,4 +1,4 @@
-export type TransactionType = 'income' | 'expense' | 'transfer'
+export type TransactionType = 'income' | 'expense' | 'transfer' | 'invoice_payment'
 export type TransactionStatus = 'paid' | 'pending'
 
 export type LedgerAccount = {
@@ -13,7 +13,8 @@ export type LedgerTransaction = {
   amountCents: number
   date: string
   status: TransactionStatus
-  accountId: string
+  /** Nulo nas receitas e despesas no cartão. */
+  accountId: string | null
   destinationAccountId: string | null
   createdAt: string
 }
