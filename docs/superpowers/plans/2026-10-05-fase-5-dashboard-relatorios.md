@@ -380,13 +380,13 @@ describe('compareCategories', () => {
       ['lazer', { paid: 300, pending: 0 }],
     ])
     const result = compareCategories(current, previous, categories)
-    expect(result.lines.map((line) => line.categoryId)).toEqual(['casa', 'mercado', 'lazer', NO_CATEGORY])
+    expect(result.lines.map((line) => line.categoryId)).toEqual(['casa', 'mercado', NO_CATEGORY, 'lazer'])
     expect(result.lines[0]).toEqual({
       categoryId: 'casa', name: 'Moradia', color: '#3b82f6', totalCents: 1200, pendingCents: 200, previousCents: 1000, change: { kind: 'pct', value: 20 },
     })
     expect(result.lines[1].change).toEqual({ kind: 'new' })
-    expect(result.lines[2]).toMatchObject({ name: 'Lazer', totalCents: 0, change: { kind: 'gone' } })
-    expect(result.lines[3]).toMatchObject({ name: 'Sem categoria', color: '#64748b' })
+    expect(result.lines[3]).toMatchObject({ name: 'Lazer', totalCents: 0, change: { kind: 'gone' } })
+    expect(result.lines[2]).toMatchObject({ name: 'Sem categoria', color: '#64748b' })
     expect(result.total).toEqual({ totalCents: 2350, pendingCents: 200, previousCents: 1300, change: { kind: 'pct', value: 81 } })
   })
   it('empate no total ordena pelo nome', () => {
