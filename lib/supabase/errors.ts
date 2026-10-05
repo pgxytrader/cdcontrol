@@ -3,6 +3,13 @@ export const GENERIC_ERROR = 'Algo deu errado. Tente novamente.'
 /** 23503 ao excluir um cartão: a mensagem genérica fala de subcategorias, que não se aplicam. */
 export const CARD_IN_USE = 'Não é possível excluir: há lançamentos neste cartão. Arquive em vez de excluir.'
 
+/** Arquivar com recorrência ativa usando o item (spec 3.5). */
+export const ARCHIVE_BLOCKED = {
+  account: 'Encerre as recorrências que usam esta conta antes de arquivar.',
+  card: 'Encerre as recorrências que usam este cartão antes de arquivar.',
+  category: 'Encerre as recorrências que usam esta categoria antes de arquivar.',
+} as const
+
 const MESSAGES: Record<string, string> = {
   // Supabase Auth
   invalid_credentials: 'E-mail ou senha incorretos.',
@@ -25,6 +32,8 @@ const MESSAGES: Record<string, string> = {
   INVALID_INVOICE: 'Fatura inválida.',
   INVALID_PLAN: 'Parcelamento inválido.',
   INVALID_INPUT: 'Dados inválidos.',
+  INVALID_RECURRENCE: 'Recorrência inválida.',
+  INVALID_BUDGET_CATEGORY: 'Orçamento só vale para categorias de despesa principais.',
   // Postgres
   '23503': 'Não é possível excluir: há lançamentos ou subcategorias vinculados. Arquive em vez de excluir.',
   '23505': 'Este registro já existe.',

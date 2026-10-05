@@ -67,6 +67,57 @@ export type Database = {
           },
         ]
       }
+      budgets: {
+        Row: {
+          amount_cents: number
+          category_id: string
+          created_at: string
+          created_by: string | null
+          household_id: string
+          id: string
+          month: string
+          repeats: boolean
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          category_id: string
+          created_at?: string
+          created_by?: string | null
+          household_id: string
+          id?: string
+          month: string
+          repeats?: boolean
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          category_id?: string
+          created_at?: string
+          created_by?: string | null
+          household_id?: string
+          id?: string
+          month?: string
+          repeats?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_invoices: {
         Row: {
           closing_date: string
@@ -473,6 +524,116 @@ export type Database = {
           },
         ]
       }
+      recurrences: {
+        Row: {
+          account_id: string | null
+          amount_cents: number
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          credit_card_id: string | null
+          description: string
+          destination_account_id: string | null
+          end_date: string | null
+          frequency: string
+          generated_until: string
+          household_id: string
+          id: string
+          notes: string | null
+          start_date: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount_cents: number
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_card_id?: string | null
+          description: string
+          destination_account_id?: string | null
+          end_date?: string | null
+          frequency: string
+          generated_until: string
+          household_id: string
+          id?: string
+          notes?: string | null
+          start_date: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          amount_cents?: number
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          credit_card_id?: string | null
+          description?: string
+          destination_account_id?: string | null
+          end_date?: string | null
+          frequency?: string
+          generated_until?: string
+          household_id?: string
+          id?: string
+          notes?: string | null
+          start_date?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurrences_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurrences_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "recurrences_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurrences_credit_card_id_fkey"
+            columns: ["credit_card_id"]
+            isOneToOne: false
+            referencedRelation: "credit_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurrences_destination_account_id_fkey"
+            columns: ["destination_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurrences_destination_account_id_fkey"
+            columns: ["destination_account_id"]
+            isOneToOne: false
+            referencedRelation: "v_account_balances"
+            referencedColumns: ["account_id"]
+          },
+          {
+            foreignKeyName: "recurrences_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           account_id: string | null
@@ -491,6 +652,8 @@ export type Database = {
           installment_plan_id: string | null
           invoice_id: string | null
           notes: string | null
+          occurrence_date: string | null
+          recurrence_id: string | null
           source: string
           status: string
           type: string
@@ -513,6 +676,8 @@ export type Database = {
           installment_plan_id?: string | null
           invoice_id?: string | null
           notes?: string | null
+          occurrence_date?: string | null
+          recurrence_id?: string | null
           source?: string
           status: string
           type: string
@@ -535,6 +700,8 @@ export type Database = {
           installment_plan_id?: string | null
           invoice_id?: string | null
           notes?: string | null
+          occurrence_date?: string | null
+          recurrence_id?: string | null
           source?: string
           status?: string
           type?: string
@@ -611,6 +778,13 @@ export type Database = {
             referencedRelation: "v_invoice_totals"
             referencedColumns: ["invoice_id"]
           },
+          {
+            foreignKeyName: "transactions_recurrence_id_fkey"
+            columns: ["recurrence_id"]
+            isOneToOne: false
+            referencedRelation: "recurrences"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -664,6 +838,14 @@ export type Database = {
       }
     }
     Functions: {
+      apply_budget_change: {
+        Args: {
+          p_category_id: string
+          p_delete_months: string[]
+          p_upserts: Json
+        }
+        Returns: undefined
+      }
       apply_card_schedule: {
         Args: {
           p_card_id: string
@@ -672,6 +854,16 @@ export type Database = {
           p_invoices: Json
           p_moves: Json
           p_plans: Json
+        }
+        Returns: undefined
+      }
+      apply_recurrence_change: {
+        Args: {
+          p_delete_ids: string[]
+          p_generated_until: string
+          p_patch: Json
+          p_recurrence_id: string
+          p_rows: Json
         }
         Returns: undefined
       }
@@ -687,6 +879,10 @@ export type Database = {
           expires_at: string
         }[]
       }
+      create_recurrence: {
+        Args: { p_recurrence: Json; p_rows: Json }
+        Returns: string
+      }
       ensure_invoice: {
         Args: {
           p_card_id: string
@@ -697,8 +893,24 @@ export type Database = {
         }
         Returns: string
       }
+      generate_recurrence_occurrences: {
+        Args: {
+          p_generated_until: string
+          p_recurrence_id: string
+          p_rows: Json
+        }
+        Returns: undefined
+      }
+      insert_recurrence_rows: {
+        Args: { p_recurrence_id: string; p_rows: Json }
+        Returns: undefined
+      }
       is_household_member: { Args: { hid: string }; Returns: boolean }
       redeem_invite: { Args: { p_code: string }; Returns: string }
+      restore_recurrence: {
+        Args: { p_recurrence: Json; p_rows: Json }
+        Returns: undefined
+      }
       restore_transactions: {
         Args: { p_plan: Json; p_rows: Json }
         Returns: undefined

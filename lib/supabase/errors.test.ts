@@ -49,4 +49,9 @@ describe('erros dos cartões', () => {
     )
     expect(CARD_IN_USE).toBe('Não é possível excluir: há lançamentos neste cartão. Arquive em vez de excluir.')
   })
+
+  it('traduz os erros de recorrência e orçamento', () => {
+    expect(translateError({ message: 'INVALID_RECURRENCE' })).toBe('Recorrência inválida.')
+    expect(translateError({ message: 'INVALID_BUDGET_CATEGORY' })).toBe('Orçamento só vale para categorias de despesa principais.')
+  })
 })
