@@ -1,4 +1,4 @@
-import { ArrowLeftRight, CreditCard } from 'lucide-react'
+import { ArrowLeftRight, CreditCard, Repeat } from 'lucide-react'
 import { CategoryIcon } from '@/components/categories/category-icon'
 import type { Category } from '@/lib/categories'
 import { formatISODateBR } from '@/lib/dates'
@@ -66,7 +66,15 @@ export function StatementList({ statement, categories, accountNames, initialBala
                   <CategoryIcon name={category?.icon ?? 'circle-ellipsis'} color={category?.color ?? '#64748b'} />
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{row.description}</p>
+                  <p className="flex min-w-0 items-center gap-1 font-medium">
+                    <span className="truncate">{row.description}</span>
+                    {row.recurrence_id ? (
+                      <>
+                        <Repeat className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                        <span className="sr-only">(recorrente)</span>
+                      </>
+                    ) : null}
+                  </p>
                   <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
                 </div>
                 <div className="shrink-0 text-right tabular-nums">
