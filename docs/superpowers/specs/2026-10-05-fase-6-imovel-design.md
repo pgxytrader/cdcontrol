@@ -68,7 +68,7 @@ Migration nova em `supabase/migrations/`. Tabelas novas seguem o padrão das fas
 ### 1.4 Triggers
 
 - **Mesma casa** (`security definer`, `search_path=''`): `property_expenses` só referencia imóvel e tipo da mesma casa; o lançamento ligado também é da mesma casa e tem `source = 'property'`.
-- **Bloqueio do lançamento ligado** (`before update on transactions`): se `old.source = 'property'` e algum de `type, amount_cents, date, status, account_id, credit_card_id, invoice_id, category_id, destination_account_id, source` mudou, recusa com `PROPERTY_LOCKED` — exceto quando `current_setting('app.property_sync', true) = 'on'` (ligado com `set_config(..., true)` só dentro dos RPCs abaixo). Descrição e observação continuam editáveis.
+- **Bloqueio do lançamento ligado** (`before update on transactions`): se `old.source = 'property'` e algum de `type, amount_cents, date, status, account_id, credit_card_id, category_id, destination_account_id, source` mudou, recusa com `PROPERTY_LOCKED` — exceto quando `current_setting('app.property_sync', true) = 'on'` (ligado com `set_config(..., true)` só dentro dos RPCs abaixo). Descrição, observação e `invoice_id` continuam editáveis (`invoice_id` porque mudar os dias do cartão, Fase 3, move lançamentos entre faturas). Inserir lançamento com `source = 'property'` fora dos RPCs também é recusado.
 - **Excluir o lançamento** (`before delete on transactions`, `old.source = 'property'`): o gasto ligado volta para previsto (`status = 'planned'`, `paid_amount_cents`, `paid_date` e `transaction_id` nulos). Vale para qualquer caminho de exclusão.
 
 ### 1.5 RPCs (`security invoker`, `search_path=''`, atômicos)
@@ -102,7 +102,7 @@ Os RPCs que mexem em lançamentos ligam `app.property_sync` só durante a própr
 
 ### 2.3 `lib/finance/property-payment.ts`
 
-- `paymentTransaction(input, today, cardContext?)` → lançamento a gravar quando a fonte é `own` e "Lançar nas finanças" está ligado: `description = "Imóvel: <descrição>"` (cortada em 120), `amount = paid`, `date = paid_date`, categoria escolhida (padrão: categoria de despesa padrão "Imóvel"), conta **ou** cartão; na conta, status por `defaultStatus(date, today)`; no cartão, fatura por `resolveCycleForDate` (Fase 3) e status por `effectiveStatus`.
+- `paymentTransaction(input, today, cardContext?)` → lançamento a gravar quando a fonte é `own` e "Lançar nas finanças" está ligado: `description = "Imóvel: <descrição>"` (cortada em 120), `amount = paid`, `date = paid_date`, categoria escolhida (padrão: categoria de despesa padrão "Imóvel"), conta **ou** cartão; status sempre `paid` (a data do pagamento não pode ser futura); no cartão, fatura por `resolveCycleForDate` (Fase 3).
 
 ### 2.4 Validação (`lib/validation/property*.ts`, zod)
 
@@ -129,7 +129,7 @@ Imóvel, gasto, pagamento, gerador (ao menos um bloco; valores > 0; datas válid
   2. **Cronograma:** linha do tempo por mês agrupada por ano: mês, previsto, realizado, barrinha; mês atual destacado; mês das chaves com "Entrega das chaves". Vazio: "Nenhum gasto cadastrado."
   3. **Por tipo:** lista com nome, previsto, pago, quantidade e barra pago/previsto.
   4. **Gastos:** filtros (tipo, status, fonte, de/até) e lista agrupada pelo mês de vencimento: descrição, tipo, favorecido, vencimento, selo (Previsto/Pago/Atrasado — texto, não só cor), previsto e pago, fonte, correção quando houver. Tocar abre o gasto com "Pagar"/"Editar pagamento", "Desmarcar pagamento", "Editar" e "Excluir" (com "Desfazer").
-- **Formulário de pagamento:** valor pago (padrão = previsto), data (padrão = hoje), fonte; "Lançar nas finanças" (ligado por padrão, só com recursos próprios); "Pagar com" (conta ou cartão; padrão a última usada pela pessoa, como no formulário rápido); categoria (padrão Imóvel). Mostra "Correção: + R$ X" / "− R$ X" quando o valor difere do previsto numa parcela da construtora.
+- **Formulário de pagamento:** valor pago (padrão = previsto), data (padrão = hoje; não pode ser futura), fonte; "Lançar nas finanças" (ligado por padrão, só com recursos próprios); "Pagar com" (conta ou cartão; padrão a última usada pela pessoa, como no formulário rápido); categoria (padrão Imóvel). Mostra "Correção: + R$ X" / "− R$ X" quando o valor difere do previsto numa parcela da construtora.
 - **Gerador:** três blocos opcionais, fonte (padrão recursos próprios), prévia e "Gerar"; toast "N gastos criados" com "Desfazer".
 - **Formulário do imóvel:** campos do 6.1; "Excluir imóvel" com confirmação mostrando quantos gastos e lançamentos serão apagados.
 - Sheet no celular, dialog no desktop (`ResponsiveModal`), como os outros formulários.
