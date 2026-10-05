@@ -6,7 +6,7 @@ import { rowToSeries } from '@/lib/recurrence-server'
 import { createClient } from '@/lib/supabase/server'
 import { RECURRENCE_RECORD_COLUMNS, type RecurrenceRecord } from '@/lib/validation/transaction-record'
 
-/** Séries ativas (sem fim ou terminando hoje ou depois) e encerradas, com a próxima data. */
+/** Séries ativas (sem fim ou terminando depois de hoje) e encerradas, com a próxima data. */
 export async function listRecurrences(today: string): Promise<{ active: RecurrenceItem[]; ended: RecurrenceItem[] }> {
   const supabase = await createClient()
   const [{ data, error }, upcoming] = await Promise.all([
@@ -41,7 +41,7 @@ export async function listRecurrences(today: string): Promise<{ active: Recurren
     const state = rowToSeries(record)
     return { ...state, nextDate: nextOccurrenceDate(bySeries.get(state.id) ?? [], today) }
   })
-  const isActive = (item: RecurrenceItem) => item.endDate === null || item.endDate >= today
+  const isActive = (item: RecurrenceItem) => item.endDate === null || item.endDate > today
   return {
     active: sortRecurrenceItems(items.filter(isActive)),
     ended: items.filter((item) => !isActive(item)).sort((a, b) => (b.endDate ?? '').localeCompare(a.endDate ?? '')),

@@ -107,7 +107,7 @@ export async function insertSeries(
   return { ok: true, data: { id: data as string } }
 }
 
-/** Há recorrência ativa (sem fim ou terminando hoje ou depois) usando o item? Null se a consulta falhar. */
+/** Há recorrência ativa (sem fim ou terminando depois de hoje) usando o item? Null se a consulta falhar. */
 export async function hasActiveRecurrence(
   supabase: SupabaseServer,
   column: 'account_id' | 'destination_account_id' | 'credit_card_id' | 'category_id',
@@ -118,7 +118,7 @@ export async function hasActiveRecurrence(
     .from('recurrences')
     .select('id', { count: 'exact', head: true })
     .eq(column, id)
-    .or(`end_date.is.null,end_date.gte.${today}`)
+    .or(`end_date.is.null,end_date.gt.${today}`)
   if (error) return null
   return (count ?? 0) > 0
 }
