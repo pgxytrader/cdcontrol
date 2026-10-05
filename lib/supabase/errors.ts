@@ -34,6 +34,11 @@ const MESSAGES: Record<string, string> = {
   INVALID_INPUT: 'Dados inválidos.',
   INVALID_RECURRENCE: 'Recorrência inválida.',
   INVALID_BUDGET_CATEGORY: 'Orçamento só vale para categorias de despesa principais.',
+  PROPERTY_LOCKED: 'Este lançamento vem do Imóvel. Edite pelo Imóvel.',
+  INVALID_PROPERTY: 'Imóvel inválido.',
+  INVALID_EXPENSE: 'Gasto do imóvel inválido.',
+  INVALID_EXPENSE_TYPE: 'Tipo de gasto inválido.',
+  INVALID_TRANSACTION: 'Lançamento inválido.',
   // Postgres
   '23503': 'Não é possível excluir: há lançamentos ou subcategorias vinculados. Arquive em vez de excluir.',
   '23505': 'Este registro já existe.',

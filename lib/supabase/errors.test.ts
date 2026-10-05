@@ -54,4 +54,8 @@ describe('erros dos cartões', () => {
     expect(translateError({ message: 'INVALID_RECURRENCE' })).toBe('Recorrência inválida.')
     expect(translateError({ message: 'INVALID_BUDGET_CATEGORY' })).toBe('Orçamento só vale para categorias de despesa principais.')
   })
+  it('traduz os erros do imóvel', () => {
+    expect(translateError({ message: 'PROPERTY_LOCKED' })).toBe('Este lançamento vem do Imóvel. Edite pelo Imóvel.')
+    expect(translateError({ message: 'INVALID_EXPENSE_TYPE' })).toBe('Tipo de gasto inválido.')
+  })
 })

@@ -5,7 +5,9 @@ import {
   FUNDING_SOURCES,
   PROPERTY_PHASES,
   TYPICAL_PHASES,
+  type AmortizationSystem,
   type PropertyExpense,
+  type PropertyPhase,
 } from '@/lib/finance/property'
 import { isoDateSchema, uuidSchema } from './common'
 import { MAX_CENTS, descriptionSchema, notesSchema } from './fields'
@@ -180,3 +182,21 @@ export type PropertySnapshot = z.output<typeof propertySnapshotSchema>
 /** Conta/cartão e categoria do lançamento ligado (para pré-preencher "Editar pagamento"). */
 export type LinkedTransaction = { accountId: string | null; creditCardId: string | null; categoryId: string | null }
 export type ExpenseView = PropertyExpense & { linked: LinkedTransaction | null }
+
+/** Imóvel como a tela usa (camelCase). */
+export type PropertyRecord = {
+  id: string
+  name: string
+  developer: string | null
+  unit: string | null
+  address: string | null
+  purchasePriceCents: number
+  contractDate: string | null
+  expectedDeliveryDate: string | null
+  phase: PropertyPhase
+  bank: string | null
+  financedAmountCents: number | null
+  termMonths: number | null
+  amortizationSystem: AmortizationSystem | null
+  annualInterestRate: number | null
+}
