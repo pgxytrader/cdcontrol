@@ -258,3 +258,18 @@ export function endSeries(current: SeriesState, ctx: ChangeContext): SeriesChang
     generatedUntil: earlier(ctx.today, current.generatedUntil),
   }
 }
+
+/** Série com a próxima data não realizada (tela Recorrências). */
+export type RecurrenceItem = SeriesState & { nextDate: string | null }
+
+/** Pela próxima data (as sem próxima no fim), depois pela descrição. */
+export function sortRecurrenceItems(items: RecurrenceItem[]): RecurrenceItem[] {
+  return [...items].sort((a, b) => {
+    if (a.nextDate !== b.nextDate) {
+      if (a.nextDate === null) return 1
+      if (b.nextDate === null) return -1
+      return a.nextDate.localeCompare(b.nextDate)
+    }
+    return a.description.localeCompare(b.description, 'pt-BR')
+  })
+}

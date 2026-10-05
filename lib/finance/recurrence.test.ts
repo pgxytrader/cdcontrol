@@ -7,6 +7,8 @@ import {
   nextOccurrenceDate,
   occurrenceDates,
   occurrencesToReplace,
+  sortRecurrenceItems,
+  type RecurrenceItem,
   type SeriesTransaction,
 } from './recurrence'
 
@@ -147,5 +149,29 @@ describe('describeSchedule', () => {
     )
     expect(describeSchedule({ frequency: 'weekly', startDate: '2026-10-10', endDate: null })).toBe('Todo sábado, sem data final')
     expect(describeSchedule({ frequency: 'yearly', startDate: '2026-03-15', endDate: null })).toBe('Todo ano em 15/03, sem data final')
+  })
+})
+
+describe('sortRecurrenceItems', () => {
+  const item = (id: string, description: string, nextDate: string | null): RecurrenceItem => ({
+    id,
+    description,
+    nextDate,
+    type: 'expense',
+    amountCents: 100,
+    categoryId: 'cat',
+    accountId: 'acc',
+    destinationAccountId: null,
+    creditCardId: null,
+    notes: null,
+    frequency: 'monthly',
+    startDate: '2026-01-01',
+    endDate: null,
+    generatedUntil: '2027-10-05',
+  })
+
+  it('pela próxima data; sem próxima data no fim; empate pela descrição', () => {
+    const sorted = sortRecurrenceItems([item('a', 'Luz', null), item('b', 'Aluguel', '2026-10-10'), item('c', 'Água', '2026-10-10'), item('d', 'Salário', '2026-10-06')])
+    expect(sorted.map((entry) => entry.id)).toEqual(['d', 'c', 'b', 'a'])
   })
 })
