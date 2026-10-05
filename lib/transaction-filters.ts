@@ -99,3 +99,12 @@ export function hasActiveFilters(filters: TransactionFilters): boolean {
 export function escapeLike(term: string): string {
   return term.replace(/[\\%_]/g, (char) => `\\${char}`)
 }
+
+/**
+ * Filtro PostgREST (para `.or()`) do status efetivo: receitas e despesas no cartão (account_id nulo)
+ * seguem a data; lançamentos em conta e pagamentos de fatura, o status salvo. `today` vem de todayISO().
+ */
+export function statusFilter(status: TransactionStatus, today: string): string {
+  const byDate = status === 'paid' ? `date.lte.${today}` : `date.gt.${today}`
+  return `and(account_id.not.is.null,status.eq.${status}),and(account_id.is.null,${byDate})`
+}

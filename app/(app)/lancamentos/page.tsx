@@ -4,11 +4,13 @@ import { MonthSummary } from '@/components/transactions/month-summary'
 import { TransactionList } from '@/components/transactions/transaction-list'
 import { TransactionsToolbar } from '@/components/transactions/transactions-toolbar'
 import { listAccounts } from '@/lib/accounts'
+import { listCardOptions } from '@/lib/cards'
 import { expandCategoryFilter } from '@/lib/categories'
 import { listCategories } from '@/lib/categories-query'
+import { todayISO } from '@/lib/dates'
 import { summarizeMonth } from '@/lib/finance/summary'
 import { filterParams, parseTransactionsQuery } from '@/lib/transaction-filters'
-import { rowToLedger } from '@/lib/transaction-mappers'
+import { applyEffectiveStatus, rowToLedger } from '@/lib/transaction-mappers'
 import { listMonthTransactions, SEARCH_LIMIT, searchTransactions } from '@/lib/transactions'
 
 export const metadata: Metadata = { title: 'Lançamentos' }
@@ -17,15 +19,23 @@ type Props = { searchParams: Promise<Record<string, string | string[] | undefine
 
 export default async function TransactionsPage({ searchParams }: Props) {
   const query = parseTransactionsQuery(await searchParams)
-  const [categories, accounts] = await Promise.all([listCategories(), listAccounts({ includeArchived: true })])
+  const today = todayISO()
+  const [categories, accounts, cards] = await Promise.all([
+    listCategories(),
+    listAccounts({ includeArchived: true }),
+    listCardOptions(),
+  ])
 
   const filters = {
     type: query.filters.type,
     status: query.filters.status,
     accountId: query.filters.accountId,
+    cardId: query.filters.cardId,
     categoryIds: query.filters.categoryId ? expandCategoryFilter(query.filters.categoryId, categories) : undefined,
   }
-  const rows = query.q ? await searchTransactions(query.q, filters) : await listMonthTransactions(query.ym, filters)
+  const found = query.q ? await searchTransactions(query.q, filters, today) : await listMonthTransactions(query.ym, filters, today)
+  // Compras no cartão: previsto/realizado pela data
+  const rows = found.map((row) => applyEffectiveStatus(row, today))
   // Trocar de mês sai do modo busca: o seletor preserva só os filtros
   const monthParams = filterParams({ ...query, q: '' })
 
@@ -36,6 +46,7 @@ export default async function TransactionsPage({ searchParams }: Props) {
         query={query}
         categories={categories}
         accounts={accounts.map((account) => ({ id: account.id, name: account.name, archived: account.archived }))}
+        cards={cards.map((card) => ({ id: card.id, name: card.name, archived: card.archived }))}
       />
       {query.q ? (
         <p className="mb-4 text-sm text-muted-foreground">
@@ -50,6 +61,7 @@ export default async function TransactionsPage({ searchParams }: Props) {
         rows={rows}
         categories={categories}
         accounts={accounts.map((account) => ({ id: account.id, name: account.name }))}
+        cards={cards.map((card) => ({ id: card.id, name: card.name }))}
         mode={query.q ? 'search' : 'month'}
       />
     </>

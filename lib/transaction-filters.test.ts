@@ -6,6 +6,7 @@ import {
   hasActiveFilters,
   normalizeSearch,
   parseTransactionsQuery,
+  statusFilter,
 } from './transaction-filters'
 
 const now = new Date('2026-10-15T12:00:00Z')
@@ -94,5 +95,14 @@ describe('filtros da Fase 3', () => {
   it('filterParams preserva o cartão', () => {
     const query = parseTransactionsQuery({ cartao: CARD, tipo: 'pagamento-fatura' }, now)
     expect(filterParams(query)).toEqual({ tipo: 'pagamento-fatura', cartao: CARD })
+  })
+})
+
+describe('statusFilter', () => {
+  it('compras no cartão (sem conta) pelo dia; o resto pelo status salvo', () => {
+    expect(statusFilter('pending', '2026-10-04')).toBe(
+      'and(account_id.not.is.null,status.eq.pending),and(account_id.is.null,date.gt.2026-10-04)',
+    )
+    expect(statusFilter('paid', '2026-10-04')).toBe('and(account_id.not.is.null,status.eq.paid),and(account_id.is.null,date.lte.2026-10-04)')
   })
 })
