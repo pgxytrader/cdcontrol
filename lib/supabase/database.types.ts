@@ -524,6 +524,216 @@ export type Database = {
           },
         ]
       }
+      properties: {
+        Row: {
+          address: string | null
+          amortization_system: string | null
+          annual_interest_rate: number | null
+          bank: string | null
+          contract_date: string | null
+          created_at: string
+          created_by: string | null
+          developer: string | null
+          expected_delivery_date: string | null
+          financed_amount_cents: number | null
+          household_id: string
+          id: string
+          name: string
+          phase: string
+          purchase_price_cents: number
+          term_months: number | null
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          amortization_system?: string | null
+          annual_interest_rate?: number | null
+          bank?: string | null
+          contract_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          developer?: string | null
+          expected_delivery_date?: string | null
+          financed_amount_cents?: number | null
+          household_id: string
+          id?: string
+          name: string
+          phase?: string
+          purchase_price_cents: number
+          term_months?: number | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          amortization_system?: string | null
+          annual_interest_rate?: number | null
+          bank?: string | null
+          contract_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          developer?: string | null
+          expected_delivery_date?: string | null
+          financed_amount_cents?: number | null
+          household_id?: string
+          id?: string
+          name?: string
+          phase?: string
+          purchase_price_cents?: number
+          term_months?: number | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "properties_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_expense_types: {
+        Row: {
+          archived: boolean
+          created_at: string
+          created_by: string | null
+          household_id: string
+          id: string
+          is_default: boolean
+          name: string
+          sort_order: number
+          system_key: string | null
+          typical_phase: string
+          updated_at: string
+        }
+        Insert: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          household_id: string
+          id?: string
+          is_default?: boolean
+          name: string
+          sort_order: number
+          system_key?: string | null
+          typical_phase: string
+          updated_at?: string
+        }
+        Update: {
+          archived?: boolean
+          created_at?: string
+          created_by?: string | null
+          household_id?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          sort_order?: number
+          system_key?: string | null
+          typical_phase?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_expense_types_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_expenses: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          due_date: string
+          expense_type_id: string
+          funding_source: string
+          household_id: string
+          id: string
+          notes: string | null
+          paid_amount_cents: number | null
+          paid_date: string | null
+          payee: string | null
+          planned_amount_cents: number
+          property_id: string
+          status: string
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description: string
+          due_date: string
+          expense_type_id: string
+          funding_source?: string
+          household_id: string
+          id?: string
+          notes?: string | null
+          paid_amount_cents?: number | null
+          paid_date?: string | null
+          payee?: string | null
+          planned_amount_cents: number
+          property_id: string
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          due_date?: string
+          expense_type_id?: string
+          funding_source?: string
+          household_id?: string
+          id?: string
+          notes?: string | null
+          paid_amount_cents?: number | null
+          paid_date?: string | null
+          payee?: string | null
+          planned_amount_cents?: number
+          property_id?: string
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_expenses_expense_type_id_fkey"
+            columns: ["expense_type_id"]
+            isOneToOne: false
+            referencedRelation: "property_expense_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_expenses_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_expenses_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_expenses_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: true
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recurrences: {
         Row: {
           account_id: string | null
@@ -879,9 +1089,18 @@ export type Database = {
           expires_at: string
         }[]
       }
+      create_property_expenses: {
+        Args: { p_property_id: string; p_rows: Json }
+        Returns: string[]
+      }
       create_recurrence: {
         Args: { p_recurrence: Json; p_rows: Json }
         Returns: string
+      }
+      delete_property: { Args: { p_property_id: string }; Returns: undefined }
+      delete_property_expenses: {
+        Args: { p_ids: string[] }
+        Returns: undefined
       }
       ensure_invoice: {
         Args: {
@@ -906,7 +1125,15 @@ export type Database = {
         Returns: undefined
       }
       is_household_member: { Args: { hid: string }; Returns: boolean }
+      pay_property_expense: {
+        Args: { p_expense_id: string; p_paid: Json; p_transaction: Json }
+        Returns: string
+      }
       redeem_invite: { Args: { p_code: string }; Returns: string }
+      restore_property_expenses: {
+        Args: { p_expenses: Json; p_transactions: Json }
+        Returns: undefined
+      }
       restore_recurrence: {
         Args: { p_recurrence: Json; p_rows: Json }
         Returns: undefined
@@ -919,7 +1146,15 @@ export type Database = {
         Args: { p_household_id: string }
         Returns: undefined
       }
+      seed_property_expense_types: {
+        Args: { p_household_id: string }
+        Returns: undefined
+      }
       shares_household_with: { Args: { other: string }; Returns: boolean }
+      unpay_property_expense: {
+        Args: { p_expense_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
