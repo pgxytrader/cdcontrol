@@ -170,5 +170,8 @@ export async function endRecurrence(id: unknown): Promise<ActionResult> {
   const loaded = await loadWithTransactions(supabase, parsedId.data)
   if (!loaded) return { ok: false, error: GENERIC_ERROR }
 
-  return apply(supabase, loaded.state.id, endSeries(loaded.state, { transactions: loaded.transactions, today: todayISO(), card: null }))
+  const today = todayISO()
+  if (loaded.state.endDate !== null && loaded.state.endDate < today) return { ok: false, error: 'Esta recorrência já foi encerrada.' }
+
+  return apply(supabase, loaded.state.id, endSeries(loaded.state, { transactions: loaded.transactions, today, card: null }))
 }
