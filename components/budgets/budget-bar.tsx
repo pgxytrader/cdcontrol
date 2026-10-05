@@ -1,4 +1,4 @@
-import type { BudgetProgress } from '@/lib/finance/budget'
+import type { BudgetLine, BudgetProgress } from '@/lib/finance/budget'
 import type { UsageLevel } from '@/lib/finance/card'
 import { cn } from '@/lib/utils'
 
@@ -22,5 +22,16 @@ export function BudgetBar({ progress, label }: { progress: BudgetProgress; label
       <div className={cn('h-full', FILL[progress.level])} style={{ width: `${realized}%` }} />
       <div className={cn('h-full opacity-40', FILL[progress.level])} style={{ width: `${planned}%` }} />
     </div>
+  )
+}
+
+/** Selo "Atenção" (80%) ou "Estourado" (100%); nada abaixo de 80%. */
+export function LevelBadge({ line }: { line: BudgetLine }) {
+  if (!line.progress || line.progress.level === 'ok') return null
+  const over = line.progress.level === 'over'
+  return (
+    <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', over ? 'bg-expense/15 text-expense' : 'bg-warning/15 text-warning')}>
+      {over ? 'Estourado' : 'Atenção'}
+    </span>
   )
 }

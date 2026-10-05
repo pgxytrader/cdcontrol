@@ -2,7 +2,7 @@ import type { MonthSummary as Summary } from '@/lib/finance/summary'
 import { formatBRL, formatSignedBRL } from '@/lib/finance/money'
 import { cn } from '@/lib/utils'
 
-function SummaryCard({ label, value, pending, tone, className }: { label: string; value: string; pending?: string; tone: string; className?: string }) {
+export function SummaryCard({ label, value, pending, tone, className }: { label: string; value: string; pending?: string; tone: string; className?: string }) {
   return (
     <div className={cn('rounded-xl border border-border bg-surface p-3', className)}>
       <p className="text-xs text-muted-foreground">{label}</p>
@@ -12,9 +12,10 @@ function SummaryCard({ label, value, pending, tone, className }: { label: string
   )
 }
 
-export function MonthSummary({ summary }: { summary: Summary }) {
+/** Receitas, despesas e saldo do mês; `extra` acrescenta cards (o Início usa para o saldo das contas). */
+export function MonthSummary({ summary, extra }: { summary: Summary; extra?: React.ReactNode }) {
   return (
-    <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3">
+    <div className={cn('mb-6 grid grid-cols-2 gap-2', extra ? 'lg:grid-cols-4' : 'sm:grid-cols-3')}>
       <SummaryCard
         label="Receitas"
         value={formatSignedBRL(summary.income.paid)}
@@ -32,8 +33,9 @@ export function MonthSummary({ summary }: { summary: Summary }) {
         value={formatSignedBRL(summary.balancePaid)}
         pending={summary.balanceProjected !== summary.balancePaid ? `${formatSignedBRL(summary.balanceProjected)} com previstos` : undefined}
         tone={summary.balancePaid < 0 ? 'text-expense' : 'text-foreground'}
-        className="col-span-2 sm:col-span-1"
+        className={extra ? undefined : 'col-span-2 sm:col-span-1'}
       />
+      {extra}
     </div>
   )
 }

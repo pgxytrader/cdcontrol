@@ -5,8 +5,7 @@ import { CategoryIcon } from '@/components/categories/category-icon'
 import { ResponsiveModal } from '@/components/layout/responsive-modal'
 import type { BudgetLine } from '@/lib/finance/budget'
 import { formatBRL } from '@/lib/finance/money'
-import { cn } from '@/lib/utils'
-import { BudgetBar } from './budget-bar'
+import { BudgetBar, LevelBadge } from './budget-bar'
 import { BudgetForm } from './budget-form'
 
 type Totals = { budgetedCents: number; realizedCents: number; plannedCents: number }
@@ -34,16 +33,6 @@ function detailText(line: BudgetLine): string {
   if (line.limitCents === null) return `${formatBRL(realizedCents + plannedCents)} no mês`
   const planned = plannedCents > 0 ? ` + ${formatBRL(plannedCents)} previstos` : ''
   return `${formatBRL(realizedCents)} gastos${planned} de ${formatBRL(line.limitCents)}`
-}
-
-function LevelBadge({ line }: { line: BudgetLine }) {
-  if (!line.progress || line.progress.level === 'ok') return null
-  const over = line.progress.level === 'over'
-  return (
-    <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', over ? 'bg-expense/15 text-expense' : 'bg-warning/15 text-warning')}>
-      {over ? 'Estourado' : 'Atenção'}
-    </span>
-  )
 }
 
 export function BudgetList({ lines, totals, month }: { lines: BudgetLine[]; totals: Totals; month: string }) {
