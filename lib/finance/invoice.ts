@@ -46,6 +46,25 @@ export function cycleForDate(card: CardSchedule, date: string): InvoiceCycle {
   return cycleForClosingMonth(card, shiftClosingMonth(sameMonth.closingMonth, 1))
 }
 
+/** Ciclo do mês de fechamento: as datas salvas, se a fatura já existe; senão, as calculadas. */
+export function storedOrComputedCycle(card: CardSchedule, closingMonth: string, stored: InvoiceCycle[]): InvoiceCycle {
+  return stored.find((cycle) => cycle.closingMonth === closingMonth) ?? cycleForClosingMonth(card, closingMonth)
+}
+
+/**
+ * Ciclo em que cai um lançamento considerando as faturas já salvas (spec 2.3 e 8.2): o fechamento salvo vence.
+ * Começa no ciclo calculado e avança enquanto a fatura salva daquele mês já fechou no dia ou antes da data.
+ * Compra anterior ao fechamento salvo continua na fatura (compra esquecida).
+ */
+export function resolveCycleForDate(card: CardSchedule, date: string, stored: InvoiceCycle[]): InvoiceCycle {
+  let cycle = storedOrComputedCycle(card, cycleForDate(card, date).closingMonth, stored)
+  // Sem fatura salva, o ciclo calculado fecha depois da data: o laço termina
+  while (cycle.closingDate <= date) {
+    cycle = storedOrComputedCycle(card, shiftClosingMonth(cycle.closingMonth, 1), stored)
+  }
+  return cycle
+}
+
 export type InvoiceStatus = 'open' | 'closed' | 'paid' | 'overdue'
 
 export const INVOICE_STATUS_LABELS: Record<InvoiceStatus, string> = {

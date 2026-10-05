@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildCardPurchase, installmentLabel, splitInstallments } from './installments'
-import { cycleForDate } from './invoice'
+import { cycleForClosingMonth, cycleForDate } from './invoice'
 
 const card = { closingDay: 3, dueDay: 10 }
 
@@ -80,6 +80,35 @@ describe('buildCardPurchase', () => {
     expect(rows[0].cycle).toEqual(cycleForDate(card, '2026-10-04'))
     expect(rows[7]).toMatchObject({ installmentNumber: 10, date: '2027-05-04' })
     expect(rows[7].cycle.closingMonth).toBe('2027-06-01')
+  })
+})
+
+describe('buildCardPurchase com faturas salvas (fechamento aumentado)', () => {
+  // Fechava dia 15; hoje 20/10 passou a fechar dia 25. Outubro já fechou em 15/10; novembro já existe.
+  const raised = { closingDay: 25, dueDay: 5 }
+  const stored = [
+    { closingMonth: '2026-10-01', closingDate: '2026-10-15', dueDate: '2026-11-05', referenceMonth: '2026-11-01' },
+    { closingMonth: '2026-11-01', closingDate: '2026-11-25', dueDate: '2026-12-05', referenceMonth: '2026-12-01' },
+  ]
+
+  it('parcelada em 21/10 começa em novembro, não na fatura de outubro já fechada', () => {
+    const { plan, rows } = buildCardPurchase(raised, { mode: 'installments', totalCents: 30_000, count: 3, date: '2026-10-21' }, stored)
+    expect(plan?.firstClosingMonth).toBe('2026-11-01')
+    expect(rows.map((row) => row.cycle)).toEqual([stored[1], cycleForClosingMonth(raised, '2026-12-01'), cycleForClosingMonth(raised, '2027-01-01')])
+  })
+
+  it('à vista e em andamento seguem a mesma regra', () => {
+    expect(buildCardPurchase(raised, { mode: 'single', amountCents: 1000, date: '2026-10-21' }, stored).rows[0].cycle).toEqual(stored[1])
+    const inProgress = buildCardPurchase(raised, { mode: 'in_progress', installmentCents: 1000, current: 2, count: 3, date: '2026-10-21' }, stored)
+    expect(inProgress.plan?.firstClosingMonth).toBe('2026-10-01')
+    expect(inProgress.rows.map((row) => [row.installmentNumber, row.cycle.closingMonth])).toEqual([
+      [2, '2026-11-01'],
+      [3, '2026-12-01'],
+    ])
+  })
+
+  it('compra esquecida antes do fechamento salvo fica em outubro', () => {
+    expect(buildCardPurchase(raised, { mode: 'single', amountCents: 1000, date: '2026-10-10' }, stored).rows[0].cycle).toEqual(stored[0])
   })
 })
 

@@ -2,7 +2,7 @@ import 'server-only'
 import { todayISO } from '@/lib/dates'
 import { fetchAllPages } from '@/lib/fetch-all'
 import { cardUsage, type CardUsage } from '@/lib/finance/card'
-import { cycleForDate } from '@/lib/finance/invoice'
+import { resolveCycleForDate } from '@/lib/finance/invoice'
 import type { CardSchedule, InvoiceCycle } from '@/lib/finance/types'
 import { createClient } from '@/lib/supabase/server'
 import type { CardBrand, CardOption } from '@/lib/validation/card'
@@ -86,15 +86,19 @@ async function loadInvoiceTotals(supabase: SupabaseServer, cardId?: string): Pro
   }))
 }
 
-/** Uso do limite e a fatura do ciclo atual (vazia se ainda não existe). */
+/** Uso do limite e a fatura do ciclo atual (vazia se ainda não existe); o fechamento salvo vence o calculado. */
 function withUsage(card: Card, invoices: InvoiceTotals[], today: string): CardWithUsage {
   const mine = invoices.filter((invoice) => invoice.creditCardId === card.id)
-  const computed = cycleForDate(toSchedule(card), today)
-  const current = mine.find((invoice) => invoice.cycle.closingMonth === computed.closingMonth)
+  const currentCycle = resolveCycleForDate(
+    toSchedule(card),
+    today,
+    mine.map((invoice) => invoice.cycle),
+  )
+  const current = mine.find((invoice) => invoice.cycle.closingMonth === currentCycle.closingMonth)
   return {
     ...card,
     usage: cardUsage(card.limitCents, mine),
-    currentCycle: current?.cycle ?? computed,
+    currentCycle,
     currentTotalCents: current?.totalCents ?? 0,
   }
 }

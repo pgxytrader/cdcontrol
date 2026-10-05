@@ -7,9 +7,9 @@ import { getCurrentUser } from '@/lib/auth'
 import { ensureInvoiceArgs, purchaseRpcArgs } from '@/lib/card-rpc'
 import { todayISO } from '@/lib/dates'
 import { buildCardPurchase } from '@/lib/finance/installments'
-import { cycleForDate } from '@/lib/finance/invoice'
+import { resolveCycleForDate } from '@/lib/finance/invoice'
 import { defaultStatus } from '@/lib/finance/status'
-import type { CardSchedule } from '@/lib/finance/types'
+import type { CardSchedule, InvoiceCycle } from '@/lib/finance/types'
 import { GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
 import { createClient } from '@/lib/supabase/server'
 import { uuidSchema } from '@/lib/validation/common'
@@ -35,6 +35,21 @@ async function loadSchedule(supabase: SupabaseServer, cardId: string): Promise<C
   return data ? { closingDay: data.closing_day, dueDay: data.due_day } : null
 }
 
+/** Faturas já salvas do cartão: o fechamento salvo vence o calculado (resolveCycleForDate). */
+async function loadStoredCycles(supabase: SupabaseServer, cardId: string): Promise<InvoiceCycle[] | null> {
+  const { data, error } = await supabase
+    .from('card_invoices')
+    .select('closing_month, closing_date, due_date, reference_month')
+    .eq('credit_card_id', cardId)
+  if (error) return null
+  return data.map((row) => ({
+    closingMonth: row.closing_month,
+    closingDate: row.closing_date,
+    dueDate: row.due_date,
+    referenceMonth: row.reference_month,
+  }))
+}
+
 async function loadInstallment(supabase: SupabaseServer, id: string) {
   const { data } = await supabase.from('transactions').select('installment_plan_id, installment_number').eq('id', id).maybeSingle()
   if (!data?.installment_plan_id || data.installment_number === null) return null
@@ -53,7 +68,10 @@ export async function createCardTransaction(input: unknown): Promise<ActionResul
   const schedule = await loadSchedule(supabase, parsed.data.creditCardId)
   if (!schedule) return { ok: false, error: translateError({ message: 'INVALID_CARD' }) }
 
-  const purchase = buildCardPurchase(schedule, toCardPurchaseInput(parsed.data))
+  const stored = await loadStoredCycles(supabase, parsed.data.creditCardId)
+  if (!stored) return { ok: false, error: GENERIC_ERROR }
+
+  const purchase = buildCardPurchase(schedule, toCardPurchaseInput(parsed.data), stored)
   const fields = {
     type: parsed.data.type,
     description: parsed.data.description,
@@ -85,7 +103,10 @@ export async function updateCardTransaction(id: unknown, input: unknown): Promis
   const schedule = await loadSchedule(supabase, parsed.data.creditCardId)
   if (!schedule) return { ok: false, error: translateError({ message: 'INVALID_CARD' }) }
 
-  const cycle = cycleForDate(schedule, parsed.data.date)
+  const stored = await loadStoredCycles(supabase, parsed.data.creditCardId)
+  if (!stored) return { ok: false, error: GENERIC_ERROR }
+
+  const cycle = resolveCycleForDate(schedule, parsed.data.date, stored)
   const { data: invoiceId, error: invoiceError } = await supabase.rpc('ensure_invoice', ensureInvoiceArgs(parsed.data.creditCardId, cycle))
   if (invoiceError) return { ok: false, error: translateError(invoiceError) }
 

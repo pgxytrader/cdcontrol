@@ -5,6 +5,7 @@ import {
   cycleForDate,
   daysInMonth,
   invoiceStatus,
+  resolveCycleForDate,
   shiftClosingMonth,
   summarizeInvoice,
 } from './invoice'
@@ -91,6 +92,41 @@ describe('cycleForDate (PRD 8.2)', () => {
 
   it('vencimento 31 em mês curto também usa o último dia', () => {
     expect(cycleForClosingMonth({ closingDay: 20, dueDay: 31 }, '2026-11-01').dueDate).toBe('2026-11-30')
+  })
+})
+
+describe('resolveCycleForDate (fechamento salvo vence)', () => {
+  // Fechava dia 15; hoje 20/10 passou a fechar dia 25. A fatura de outubro já fechou em 15/10.
+  const raised = { closingDay: 25, dueDay: 5 }
+  const octClosed = { closingMonth: '2026-10-01', closingDate: '2026-10-15', dueDate: '2026-11-05', referenceMonth: '2026-11-01' }
+
+  it('compra depois do fechamento salvo vai para a fatura seguinte', () => {
+    expect(cycleForDate(raised, '2026-10-21').closingMonth).toBe('2026-10-01')
+    expect(resolveCycleForDate(raised, '2026-10-21', [octClosed])).toEqual(cycleForClosingMonth(raised, '2026-11-01'))
+  })
+
+  it('no dia do fechamento salvo também vai para a seguinte', () => {
+    expect(resolveCycleForDate(raised, '2026-10-15', [octClosed]).closingMonth).toBe('2026-11-01')
+  })
+
+  it('compra esquecida, antes do fechamento salvo, fica na fatura fechada', () => {
+    expect(resolveCycleForDate(raised, '2026-10-10', [octClosed])).toEqual(octClosed)
+  })
+
+  it('sem faturas salvas é o mesmo que cycleForDate', () => {
+    for (const date of ['2026-10-02', '2026-10-03', '2026-12-15', '2027-02-28']) {
+      expect(resolveCycleForDate(card, date, [])).toEqual(cycleForDate(card, date))
+    }
+  })
+
+  it('fatura salva aberta usa as datas salvas', () => {
+    const storedNov = { closingMonth: '2026-11-01', closingDate: '2026-11-04', dueDate: '2026-11-12', referenceMonth: '2026-11-01' }
+    expect(resolveCycleForDate(card, '2026-10-20', [storedNov])).toEqual(storedNov)
+  })
+
+  it('a fatura seguinte, se salva, também vem com as datas salvas', () => {
+    const novStored = { closingMonth: '2026-11-01', closingDate: '2026-11-24', dueDate: '2026-12-04', referenceMonth: '2026-12-01' }
+    expect(resolveCycleForDate(raised, '2026-10-21', [novStored, octClosed])).toEqual(novStored)
   })
 })
 

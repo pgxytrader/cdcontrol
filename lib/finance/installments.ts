@@ -1,4 +1,4 @@
-import { addMonthsClamped, cycleForClosingMonth, cycleForDate, shiftClosingMonth } from './invoice'
+import { addMonthsClamped, resolveCycleForDate, shiftClosingMonth, storedOrComputedCycle } from './invoice'
 import type { CardSchedule, InvoiceCycle } from './types'
 
 export const MAX_INSTALLMENTS = 24
@@ -30,20 +30,21 @@ export type RowDraft = { amountCents: number; date: string; installmentNumber: n
 export type CardPurchase = { plan: PlanDraft | null; rows: RowDraft[] }
 
 /** Parcela k sempre na fatura de firstClosingMonth + (k−1), nunca pela data da parcela. */
-function installmentCycle(card: CardSchedule, firstClosingMonth: string, k: number): InvoiceCycle {
-  return cycleForClosingMonth(card, shiftClosingMonth(firstClosingMonth, k - 1))
+function installmentCycle(card: CardSchedule, firstClosingMonth: string, k: number, stored: InvoiceCycle[]): InvoiceCycle {
+  return storedOrComputedCycle(card, shiftClosingMonth(firstClosingMonth, k - 1), stored)
 }
 
-export function buildCardPurchase(card: CardSchedule, input: CardPurchaseInput): CardPurchase {
+/** `stored`: faturas já salvas do cartão — o fechamento salvo vence o calculado (resolveCycleForDate). */
+export function buildCardPurchase(card: CardSchedule, input: CardPurchaseInput, stored: InvoiceCycle[] = []): CardPurchase {
   if (input.mode === 'single') {
     return {
       plan: null,
-      rows: [{ amountCents: input.amountCents, date: input.date, installmentNumber: null, cycle: cycleForDate(card, input.date) }],
+      rows: [{ amountCents: input.amountCents, date: input.date, installmentNumber: null, cycle: resolveCycleForDate(card, input.date, stored) }],
     }
   }
 
   if (input.mode === 'installments') {
-    const firstClosingMonth = cycleForDate(card, input.date).closingMonth
+    const firstClosingMonth = resolveCycleForDate(card, input.date, stored).closingMonth
     return {
       plan: {
         totalAmountCents: input.totalCents,
@@ -56,20 +57,20 @@ export function buildCardPurchase(card: CardSchedule, input: CardPurchaseInput):
         amountCents,
         date: addMonthsClamped(input.date, index),
         installmentNumber: index + 1,
-        cycle: installmentCycle(card, firstClosingMonth, index + 1),
+        cycle: installmentCycle(card, firstClosingMonth, index + 1, stored),
       })),
     }
   }
 
   const offset = input.current - 1
-  const firstClosingMonth = shiftClosingMonth(cycleForDate(card, input.date).closingMonth, -offset)
+  const firstClosingMonth = shiftClosingMonth(resolveCycleForDate(card, input.date, stored).closingMonth, -offset)
   const rows: RowDraft[] = []
   for (let k = input.current; k <= input.count; k += 1) {
     rows.push({
       amountCents: input.installmentCents,
       date: addMonthsClamped(input.date, k - input.current),
       installmentNumber: k,
-      cycle: installmentCycle(card, firstClosingMonth, k),
+      cycle: installmentCycle(card, firstClosingMonth, k, stored),
     })
   }
   return {
