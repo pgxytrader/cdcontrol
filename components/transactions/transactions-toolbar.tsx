@@ -22,9 +22,10 @@ type ToolbarProps = {
   query: TransactionsQuery
   categories: Category[]
   accounts: { id: string; name: string; archived: boolean }[]
+  cards: { id: string; name: string; archived: boolean }[]
 }
 
-function FilterControls({ query, categories, accounts, onChange }: ToolbarProps & { onChange: (filters: TransactionFilters) => void }) {
+function FilterControls({ query, categories, accounts, cards, onChange }: ToolbarProps & { onChange: (filters: TransactionFilters) => void }) {
   const { filters } = query
   const set = (patch: TransactionFilters) => onChange({ ...filters, ...patch })
   const expenseTree = buildCategoryTree(categories.filter((c) => c.kind === 'expense'))
@@ -37,6 +38,7 @@ function FilterControls({ query, categories, accounts, onChange }: ToolbarProps 
         <option value="expense">Despesas</option>
         <option value="income">Receitas</option>
         <option value="transfer">Transferências</option>
+        <option value="invoice_payment">Pagamentos de fatura</option>
       </NativeSelect>
       <NativeSelect aria-label="Categoria" value={filters.categoryId ?? ''} onChange={(e) => set({ categoryId: e.target.value || undefined })}>
         <option value="">Todas as categorias</option>
@@ -66,6 +68,16 @@ function FilterControls({ query, categories, accounts, onChange }: ToolbarProps 
           </option>
         ))}
       </NativeSelect>
+      {cards.length > 0 ? (
+        <NativeSelect aria-label="Cartão" value={filters.cardId ?? ''} onChange={(e) => set({ cardId: e.target.value || undefined })}>
+          <option value="">Todos os cartões</option>
+          {cards.map((card) => (
+            <option key={card.id} value={card.id}>
+              {card.archived ? `${card.name} (arquivado)` : card.name}
+            </option>
+          ))}
+        </NativeSelect>
+      ) : null}
       <NativeSelect aria-label="Status" value={filters.status ?? ''} onChange={(e) => set({ status: (e.target.value || undefined) as TransactionStatus | undefined })}>
         <option value="">Pagos e pendentes</option>
         <option value="paid">Pagos</option>
@@ -75,7 +87,7 @@ function FilterControls({ query, categories, accounts, onChange }: ToolbarProps 
   )
 }
 
-export function TransactionsToolbar({ query, categories, accounts }: ToolbarProps) {
+export function TransactionsToolbar({ query, categories, accounts, cards }: ToolbarProps) {
   const router = useRouter()
   const [text, setText] = useState(query.q)
   // Next preserva o estado ao mudar só a URL: ressincroniza quando o q da URL muda por fora (ex.: menu "Lançamentos")
@@ -124,7 +136,7 @@ export function TransactionsToolbar({ query, categories, accounts }: ToolbarProp
               <SheetDescription className="sr-only">Filtrar lançamentos</SheetDescription>
             </SheetHeader>
             <div className="grid gap-3 px-4">
-              <FilterControls query={query} categories={categories} accounts={accounts} onChange={applyFilters} />
+              <FilterControls query={query} categories={categories} accounts={accounts} cards={cards} onChange={applyFilters} />
               {active ? (
                 <Button variant="ghost" onClick={() => applyFilters({})}>
                   Limpar filtros
@@ -134,8 +146,8 @@ export function TransactionsToolbar({ query, categories, accounts }: ToolbarProp
           </SheetContent>
         </Sheet>
       </div>
-      <div className="hidden gap-2 lg:grid lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
-        <FilterControls query={query} categories={categories} accounts={accounts} onChange={applyFilters} />
+      <div className="hidden gap-2 lg:grid lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]">
+        <FilterControls query={query} categories={categories} accounts={accounts} cards={cards} onChange={applyFilters} />
         <Button variant="ghost" onClick={() => applyFilters({})} disabled={!active}>
           <X aria-hidden />
           Limpar

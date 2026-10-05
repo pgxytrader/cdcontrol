@@ -26,4 +26,13 @@ describe('summarizeMonth', () => {
       balanceProjected: 0,
     })
   })
+
+  it('pagamento de fatura não é despesa (PRD 8.5)', () => {
+    const summary = summarizeMonth([
+      { type: 'invoice_payment', status: 'paid', amountCents: 5000 },
+      { type: 'expense', status: 'paid', amountCents: 1000 },
+    ])
+    expect(summary.expense.paid).toBe(1000)
+    expect(summary.balancePaid).toBe(-1000)
+  })
 })

@@ -10,15 +10,29 @@ import { NativeSelect } from '@/components/form/native-select'
 import { Segmented } from '@/components/form/segmented'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { createTransaction, deleteTransaction, restoreTransaction, updateTransaction } from '@/lib/actions/transactions'
+import type { ActionResult } from '@/lib/action-result'
+import { createCardTransaction, deleteInstallments, updateCardTransaction, updateInstallments } from '@/lib/actions/card-transactions'
+import { createTransaction, deleteTransaction, restoreTransactions, updateTransaction } from '@/lib/actions/transactions'
 import { activeCategories, buildCategoryTree, chipCategories, type Category } from '@/lib/categories'
-import { addDaysISO, todayISO } from '@/lib/dates'
+import { addDaysISO, formatISODateBR, formatYearMonthLabel, todayISO, yearMonthOfISO } from '@/lib/dates'
+import { MAX_INSTALLMENTS, splitInstallments } from '@/lib/finance/installments'
+import { cycleForDate } from '@/lib/finance/invoice'
+import { formatBRL } from '@/lib/finance/money'
 import { defaultStatus } from '@/lib/finance/status'
-import type { TransactionStatus, TransactionType } from '@/lib/finance/types'
+import type { TransactionStatus } from '@/lib/finance/types'
 import { applyActionErrors } from '@/lib/forms'
-import { pickDefaultAccountId } from '@/lib/transaction-mappers'
+import { decodeSource, encodeSource, pickDefaultAccountId, pickDefaultSource, type InstallmentInfo } from '@/lib/transaction-mappers'
 import { cn } from '@/lib/utils'
-import { toTransactionInput, transactionFormResolver, type TransactionFormValues } from '@/lib/validation/transaction'
+import {
+  isCardForm,
+  toCardTransactionInput,
+  toTransactionInput,
+  transactionFormResolver,
+  type FormTransactionType,
+  type InstallmentScope,
+  type TransactionFormValues,
+} from '@/lib/validation/transaction'
+import type { DeletionSnapshot } from '@/lib/validation/transaction-record'
 import { useTransactionFormData } from './form-data-context'
 
 const TYPE_OPTIONS = [
@@ -31,6 +45,9 @@ const STATUS_OPTIONS = [
   { value: 'paid', label: 'Pago' },
   { value: 'pending', label: 'Pendente' },
 ] as const
+
+const NUMBERS = Array.from({ length: MAX_INSTALLMENTS }, (_, index) => index + 1)
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 function CategoryOption({ category, selected, onSelect }: { category: Category; selected: boolean; onSelect: (id: string) => void }) {
   return (
@@ -46,12 +63,19 @@ function CategoryOption({ category, selected, onSelect }: { category: Category; 
   )
 }
 
-type TransactionFormProps = { transactionId?: string; initial?: TransactionFormValues; onDone: () => void }
+type TransactionFormProps = {
+  transactionId?: string
+  initial?: TransactionFormValues
+  /** Parcela de uma compra: valor, cartão, data e parcelas ficam travados. */
+  installment?: InstallmentInfo
+  onDone: () => void
+}
 
-export function TransactionForm({ transactionId, initial, onDone }: TransactionFormProps) {
+export function TransactionForm({ transactionId, initial, installment, onDone }: TransactionFormProps) {
   const data = useTransactionFormData()
   const [today] = useState(() => todayISO())
   const activeAccounts = data.accounts.filter((account) => !account.archived)
+  const activeCards = data.cards.filter((card) => !card.archived)
   const form = useForm<TransactionFormValues>({
     resolver: transactionFormResolver,
     defaultValues: initial ?? {
@@ -59,22 +83,40 @@ export function TransactionForm({ transactionId, initial, onDone }: TransactionF
       amountCents: 0,
       description: '',
       categoryId: '',
-      accountId: pickDefaultAccountId(activeAccounts, data.lastAccountId) ?? '',
+      ...pickDefaultSource(activeAccounts, activeCards, data.lastAccountId, data.lastCreditCardId),
       destinationAccountId: '',
       date: today,
       status: 'paid',
       notes: '',
+      installmentsCount: 1,
+      inProgress: false,
+      currentInstallment: 1,
     },
   })
   const [statusTouched, setStatusTouched] = useState(Boolean(initial))
   const [showAllCategories, setShowAllCategories] = useState(false)
   const [showNotes, setShowNotes] = useState(Boolean(initial?.notes))
+  const [scopeAction, setScopeAction] = useState<'save' | 'delete' | null>(null)
+  const [busy, setBusy] = useState(false)
   const { errors, isSubmitting } = form.formState
+  const locked = Boolean(installment)
 
-  const [type, date, status, accountId, destinationAccountId, categoryId] = useWatch({
-    control: form.control,
-    name: ['type', 'date', 'status', 'accountId', 'destinationAccountId', 'categoryId'],
-  })
+  const [type, date, status, accountId, creditCardId, destinationAccountId, categoryId, amountCents, installmentsCount, inProgress] =
+    useWatch({
+      control: form.control,
+      name: [
+        'type',
+        'date',
+        'status',
+        'accountId',
+        'creditCardId',
+        'destinationAccountId',
+        'categoryId',
+        'amountCents',
+        'installmentsCount',
+        'inProgress',
+      ],
+    })
 
   const kind = type === 'income' ? 'income' : 'expense'
   const candidates = activeCategories(data.categories).filter((category) => category.kind === kind)
@@ -84,19 +126,55 @@ export function TransactionForm({ transactionId, initial, onDone }: TransactionF
     selectedCategory && !chips.some((chip) => chip.id === selectedCategory.id) ? [selectedCategory, ...chips] : chips
   const tree = buildCategoryTree(candidates)
 
+  const isCard = isCardForm({ type, creditCardId })
+  const card = data.cards.find((item) => item.id === creditCardId)
   const accountOptions = (selectedId: string) => data.accounts.filter((account) => !account.archived || account.id === selectedId)
+  const cardOptions = data.cards.filter((item) => !item.archived || item.id === creditCardId)
   const touchedAccounts = type === 'transfer' ? [accountId, destinationAccountId] : [accountId]
-  const beforeInitialBalance = touchedAccounts.some((id) => {
-    const account = data.accounts.find((a) => a.id === id)
-    return account ? date < account.initialBalanceDate : false
-  })
+  const beforeInitialBalance =
+    !isCard &&
+    touchedAccounts.some((id) => {
+      const account = data.accounts.find((a) => a.id === id)
+      return account ? date < account.initialBalanceDate : false
+    })
+  const cycle = isCard && card && !locked && ISO_DATE.test(date) ? cycleForDate(card, date) : null
+  const canSplit = isCard && type === 'expense' && !transactionId
+  const firstInstallment =
+    canSplit && !inProgress && installmentsCount > 1 && amountCents >= installmentsCount
+      ? splitInstallments(amountCents, installmentsCount)[0]
+      : null
 
   const revalidate = { shouldValidate: form.formState.isSubmitted }
 
-  function changeType(value: TransactionType) {
+  function changeType(value: FormTransactionType) {
     form.setValue('type', value)
     form.setValue('categoryId', '', revalidate)
+    if (value === 'transfer' && form.getValues('creditCardId')) {
+      form.setValue('creditCardId', '')
+      form.setValue('accountId', pickDefaultAccountId(activeAccounts, data.lastAccountId) ?? '')
+    }
+    if (value !== 'expense') {
+      form.setValue('installmentsCount', 1)
+      form.setValue('inProgress', false)
+    }
     setShowAllCategories(false)
+  }
+
+  function changeSource(value: string) {
+    const source = decodeSource(value)
+    form.setValue('accountId', source.accountId, revalidate)
+    form.setValue('creditCardId', source.creditCardId, revalidate)
+    if (!source.creditCardId) {
+      form.setValue('installmentsCount', 1)
+      form.setValue('inProgress', false)
+    }
+  }
+
+  function toggleInProgress() {
+    const next = !inProgress
+    form.setValue('inProgress', next)
+    form.setValue('currentInstallment', 1)
+    if (next && form.getValues('installmentsCount') < 2) form.setValue('installmentsCount', 2)
   }
 
   function changeDate(value: string) {
@@ -114,9 +192,33 @@ export function TransactionForm({ transactionId, initial, onDone }: TransactionF
     setShowAllCategories(false)
   }
 
+  function toastDeleted(snapshot: DeletionSnapshot, message: string) {
+    toast(message, {
+      action: {
+        label: 'Desfazer',
+        onClick: async () => {
+          const restored = await restoreTransactions(snapshot)
+          if (restored.ok) toast.success('Lançamento restaurado.')
+          else toast.error(restored.error)
+        },
+      },
+    })
+  }
+
   const onSubmit = form.handleSubmit(async (values) => {
-    const input = toTransactionInput(values)
-    const result = transactionId ? await updateTransaction(transactionId, input) : await createTransaction(input)
+    // Parcela: primeiro pergunta onde aplicar
+    if (locked) {
+      setScopeAction('save')
+      return
+    }
+    let result: ActionResult<unknown>
+    if (isCardForm(values)) {
+      const input = toCardTransactionInput(values)
+      result = transactionId ? await updateCardTransaction(transactionId, input) : await createCardTransaction(input)
+    } else {
+      const input = toTransactionInput(values)
+      result = transactionId ? await updateTransaction(transactionId, input) : await createTransaction(input)
+    }
     if (!result.ok) {
       applyActionErrors(form, result)
       return
@@ -127,32 +229,58 @@ export function TransactionForm({ transactionId, initial, onDone }: TransactionF
 
   async function onDelete() {
     if (!transactionId) return
+    if (locked) {
+      setScopeAction('delete')
+      return
+    }
     const result = await deleteTransaction(transactionId)
     if (!result.ok) {
       toast.error(result.error)
       return
     }
-    const snapshot = result.data
-    toast('Lançamento excluído.', {
-      action: {
-        label: 'Desfazer',
-        onClick: async () => {
-          const restored = await restoreTransaction(snapshot)
-          if (restored.ok) toast.success('Lançamento restaurado.')
-          else toast.error(restored.error)
-        },
-      },
-    })
+    toastDeleted(result.data, 'Lançamento excluído.')
     onDone()
+  }
+
+  async function applyScope(scope: InstallmentScope) {
+    if (!transactionId || !scopeAction) return
+    setBusy(true)
+    try {
+      if (scopeAction === 'save') {
+        const values = form.getValues()
+        const result = await updateInstallments(transactionId, {
+          scope,
+          description: values.description,
+          categoryId: values.categoryId,
+          notes: values.notes,
+        })
+        if (!result.ok) {
+          applyActionErrors(form, result)
+          return
+        }
+        toast.success(scope === 'one' ? 'Parcela atualizada.' : 'Parcelas atualizadas.')
+      } else {
+        const result = await deleteInstallments(transactionId, scope)
+        if (!result.ok) {
+          toast.error(result.error)
+          return
+        }
+        toastDeleted(result.data, scope === 'one' ? 'Parcela excluída.' : 'Parcelas excluídas.')
+      }
+      onDone()
+    } finally {
+      setBusy(false)
+      setScopeAction(null)
+    }
   }
 
   return (
     <form onSubmit={onSubmit} className="space-y-5 pb-2" noValidate>
-      <Segmented label="Tipo de lançamento" value={type} options={TYPE_OPTIONS} onChange={changeType} />
+      {locked ? null : <Segmented label="Tipo de lançamento" value={type} options={TYPE_OPTIONS} onChange={changeType} />}
 
       <div>
         <label htmlFor="tx-amount" className="text-sm text-muted-foreground">
-          Valor
+          {canSplit && inProgress ? 'Valor da parcela' : 'Valor'}
         </label>
         <div className="flex items-baseline gap-2 border-b border-border pb-2">
           <span className="text-2xl text-muted-foreground">R$</span>
@@ -164,6 +292,7 @@ export function TransactionForm({ transactionId, initial, onDone }: TransactionF
                 id="tx-amount"
                 size="lg"
                 autoFocus={!transactionId}
+                disabled={locked}
                 valueCents={field.value}
                 onChangeCents={field.onChange}
                 aria-invalid={Boolean(errors.amountCents)}
@@ -245,25 +374,25 @@ export function TransactionForm({ transactionId, initial, onDone }: TransactionF
         </fieldset>
       ) : null}
 
-      <div className={cn('grid gap-4', type === 'transfer' && 'sm:grid-cols-2')}>
-        <Field id="tx-account" label={type === 'transfer' ? 'De' : 'Conta'} error={errors.accountId?.message}>
-          <NativeSelect
-            id="tx-account"
-            aria-invalid={Boolean(errors.accountId)}
-            aria-describedby={errors.accountId ? 'tx-account-error' : undefined}
-            {...form.register('accountId')}
-          >
-            <option value="" disabled>
-              Escolha…
-            </option>
-            {accountOptions(accountId).map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name}
+      {type === 'transfer' ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field id="tx-account" label="De" error={errors.accountId?.message}>
+            <NativeSelect
+              id="tx-account"
+              aria-invalid={Boolean(errors.accountId)}
+              aria-describedby={errors.accountId ? 'tx-account-error' : undefined}
+              {...form.register('accountId')}
+            >
+              <option value="" disabled>
+                Escolha…
               </option>
-            ))}
-          </NativeSelect>
-        </Field>
-        {type === 'transfer' ? (
+              {accountOptions(accountId).map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
           <Field id="tx-destination" label="Para" error={errors.destinationAccountId?.message}>
             <NativeSelect
               id="tx-destination"
@@ -281,32 +410,123 @@ export function TransactionForm({ transactionId, initial, onDone }: TransactionF
               ))}
             </NativeSelect>
           </Field>
-        ) : null}
-      </div>
+        </div>
+      ) : (
+        <Field id="tx-source" label="Pagar com" error={errors.accountId?.message ?? errors.creditCardId?.message}>
+          <NativeSelect
+            id="tx-source"
+            value={encodeSource({ accountId, creditCardId })}
+            onChange={(event) => changeSource(event.target.value)}
+            disabled={locked}
+            aria-invalid={Boolean(errors.accountId ?? errors.creditCardId)}
+            aria-describedby={errors.accountId || errors.creditCardId ? 'tx-source-error' : undefined}
+          >
+            <option value="" disabled>
+              Escolha…
+            </option>
+            <optgroup label="Contas">
+              {accountOptions(accountId).map((account) => (
+                <option key={account.id} value={`account:${account.id}`}>
+                  {account.name}
+                </option>
+              ))}
+            </optgroup>
+            {cardOptions.length > 0 ? (
+              <optgroup label="Cartões">
+                {cardOptions.map((item) => (
+                  <option key={item.id} value={`card:${item.id}`}>
+                    {item.name}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null}
+          </NativeSelect>
+        </Field>
+      )}
+      {isCard && type === 'income' ? (
+        <p className="-mt-3 text-sm text-muted-foreground">Estorno / crédito no cartão: abate o total da fatura.</p>
+      ) : null}
 
-      <Field id="tx-date" label="Data" error={errors.date?.message}>
+      {canSplit ? (
+        <div className="space-y-2">
+          {inProgress ? (
+            <div className="grid grid-cols-2 gap-4">
+              <Field id="tx-current" label="Parcela atual" error={errors.currentInstallment?.message}>
+                <NativeSelect id="tx-current" {...form.register('currentInstallment', { valueAsNumber: true })}>
+                  {NUMBERS.slice(0, installmentsCount).map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+              <Field id="tx-count" label="De" error={errors.installmentsCount?.message}>
+                <NativeSelect id="tx-count" {...form.register('installmentsCount', { valueAsNumber: true })}>
+                  {NUMBERS.slice(1).map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </Field>
+            </div>
+          ) : (
+            <Field id="tx-count" label="Parcelas" error={errors.installmentsCount?.message}>
+              <NativeSelect id="tx-count" {...form.register('installmentsCount', { valueAsNumber: true })}>
+                {NUMBERS.map((n) => (
+                  <option key={n} value={n}>
+                    {n === 1 ? 'À vista (1x)' : `${n}x`}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+          )}
+          {firstInstallment !== null ? (
+            <p className="text-sm text-muted-foreground tabular-nums">
+              {installmentsCount}x de {formatBRL(firstInstallment)}
+            </p>
+          ) : null}
+          <button type="button" className="text-sm text-muted-foreground underline underline-offset-4" onClick={toggleInProgress}>
+            {inProgress ? 'Compra nova (informar o valor total)' : 'Compra já em andamento?'}
+          </button>
+        </div>
+      ) : null}
+      {installment ? (
+        <p className="text-sm text-muted-foreground">
+          Parcela {installment.number} de {installment.count}. Para mudar valor, parcelas ou cartão, exclua e lance de novo.
+        </p>
+      ) : null}
+
+      <Field id="tx-date" label={canSplit && inProgress ? 'Data da parcela atual' : 'Data'} error={errors.date?.message}>
         <div className="flex gap-2">
           <Input
             id="tx-date"
             type="date"
             value={date}
+            disabled={locked}
             onChange={(event) => changeDate(event.target.value)}
             aria-invalid={Boolean(errors.date)}
             className="flex-1"
           />
-          <Button type="button" variant="outline" onClick={() => changeDate(today)}>
+          <Button type="button" variant="outline" disabled={locked} onClick={() => changeDate(today)}>
             Hoje
           </Button>
-          <Button type="button" variant="outline" onClick={() => changeDate(addDaysISO(today, -1))}>
+          <Button type="button" variant="outline" disabled={locked} onClick={() => changeDate(addDaysISO(today, -1))}>
             Ontem
           </Button>
         </div>
       </Field>
+      {cycle ? (
+        <p className="-mt-3 text-sm text-muted-foreground">
+          Cai na fatura de {formatYearMonthLabel(yearMonthOfISO(cycle.referenceMonth)).toLowerCase()} (fecha{' '}
+          {formatISODateBR(cycle.closingDate).slice(0, 5)}, vence {formatISODateBR(cycle.dueDate).slice(0, 5)}).
+        </p>
+      ) : null}
       {beforeInitialBalance ? (
         <p className="-mt-3 text-sm text-warning">Este lançamento não afeta o saldo atual desta conta (data anterior ao saldo inicial).</p>
       ) : null}
 
-      <Segmented label="Status" value={status} options={STATUS_OPTIONS} onChange={changeStatus} />
+      {isCard ? null : <Segmented label="Status" value={status} options={STATUS_OPTIONS} onChange={changeStatus} />}
 
       {showNotes ? (
         <Field id="tx-notes" label="Observação" error={errors.notes?.message}>
@@ -323,16 +543,33 @@ export function TransactionForm({ transactionId, initial, onDone }: TransactionF
         </button>
       )}
 
-      <div className="flex gap-2">
-        <Button type="submit" className="flex-1" disabled={isSubmitting}>
-          {isSubmitting ? 'Salvando…' : 'Salvar'}
-        </Button>
-        {transactionId ? (
-          <Button type="button" variant="outline" className="text-expense" onClick={onDelete} disabled={isSubmitting}>
-            Excluir
+      {scopeAction ? (
+        <div className="space-y-2 rounded-lg border border-border p-3" role="group" aria-label="Escolha o alcance">
+          <p className="text-sm font-medium">{scopeAction === 'save' ? 'Aplicar a alteração em:' : 'Excluir:'}</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button type="button" variant="outline" disabled={busy} onClick={() => applyScope('one')}>
+              Só esta parcela
+            </Button>
+            <Button type="button" variant="outline" disabled={busy} onClick={() => applyScope('future')}>
+              Esta e as futuras
+            </Button>
+          </div>
+          <Button type="button" variant="ghost" className="w-full" disabled={busy} onClick={() => setScopeAction(null)}>
+            Cancelar
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button type="submit" className="flex-1" disabled={isSubmitting}>
+            {isSubmitting ? 'Salvando…' : 'Salvar'}
+          </Button>
+          {transactionId ? (
+            <Button type="button" variant="outline" className="text-expense" onClick={onDelete} disabled={isSubmitting}>
+              Excluir
+            </Button>
+          ) : null}
+        </div>
+      )}
     </form>
   )
 }

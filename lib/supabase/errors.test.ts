@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GENERIC_ERROR, translateError } from './errors'
+import { CARD_IN_USE, GENERIC_ERROR, translateError } from './errors'
 
 describe('translateError', () => {
   it('traduz erros do Supabase Auth pelo code', () => {
@@ -35,5 +35,18 @@ describe('erros das finanças', () => {
       'Não é possível excluir: há lançamentos ou subcategorias vinculados. Arquive em vez de excluir.',
     )
     expect(translateError({ code: '23505', message: 'duplicate key value' })).toBe('Este registro já existe.')
+  })
+})
+
+describe('erros dos cartões', () => {
+  it('traduz os códigos da Fase 3', () => {
+    expect(translateError({ code: 'P0001', message: 'INVALID_CARD' })).toBe('Cartão inválido.')
+    expect(translateError({ code: 'P0001', message: 'INVALID_INVOICE' })).toBe('Fatura inválida.')
+    expect(translateError({ code: 'P0001', message: 'INVALID_PLAN' })).toBe('Parcelamento inválido.')
+    expect(translateError({ code: 'P0001', message: 'INVALID_INPUT' })).toBe('Dados inválidos.')
+    expect(translateError({ code: '23514', message: 'violates check constraint' })).toBe(
+      'Os dados do lançamento não combinam. Confira e tente de novo.',
+    )
+    expect(CARD_IN_USE).toBe('Não é possível excluir: há lançamentos neste cartão. Arquive em vez de excluir.')
   })
 })

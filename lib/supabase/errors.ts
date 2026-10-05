@@ -1,5 +1,8 @@
 export const GENERIC_ERROR = 'Algo deu errado. Tente novamente.'
 
+/** 23503 ao excluir um cartão: a mensagem genérica fala de subcategorias, que não se aplicam. */
+export const CARD_IN_USE = 'Não é possível excluir: há lançamentos neste cartão. Arquive em vez de excluir.'
+
 const MESSAGES: Record<string, string> = {
   // Supabase Auth
   invalid_credentials: 'E-mail ou senha incorretos.',
@@ -18,9 +21,14 @@ const MESSAGES: Record<string, string> = {
   INVALID_ACCOUNT: 'Conta inválida.',
   INVALID_CATEGORY: 'Categoria inválida.',
   CATEGORY_KIND_MISMATCH: 'A categoria não combina com o tipo do lançamento.',
+  INVALID_CARD: 'Cartão inválido.',
+  INVALID_INVOICE: 'Fatura inválida.',
+  INVALID_PLAN: 'Parcelamento inválido.',
+  INVALID_INPUT: 'Dados inválidos.',
   // Postgres
   '23503': 'Não é possível excluir: há lançamentos ou subcategorias vinculados. Arquive em vez de excluir.',
   '23505': 'Este registro já existe.',
+  '23514': 'Os dados do lançamento não combinam. Confira e tente de novo.',
 }
 
 /** Traduz erros do Supabase (Auth, PostgREST ou RPC) para uma mensagem em pt-BR. */

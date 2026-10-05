@@ -2,14 +2,17 @@
 
 import { createContext, useContext } from 'react'
 import type { Category, CategoryKind } from '@/lib/categories'
+import type { CardOption } from '@/lib/validation/card'
 
 export type AccountOption = { id: string; name: string; color: string; archived: boolean; initialBalanceDate: string }
 
 export type TransactionFormData = {
   accounts: AccountOption[]
+  cards: CardOption[]
   categories: Category[]
   topCategoryIds: Record<CategoryKind, string[]>
   lastAccountId: string | null
+  lastCreditCardId: string | null
 }
 
 const TransactionFormDataContext = createContext<TransactionFormData | null>(null)

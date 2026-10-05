@@ -1,9 +1,11 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import type { Category } from '@/lib/categories'
+import { invoiceHref } from '@/lib/invoice-labels'
 import { groupByDay, groupByMonth, splitPending, type TransactionGroup } from '@/lib/transaction-grouping'
-import { rowToFormValues, type TransactionRow } from '@/lib/transaction-mappers'
+import { installmentInfo, rowToFormValues, type TransactionRow } from '@/lib/transaction-mappers'
 import { TransactionItem } from './transaction-item'
 import { TransactionModal } from './transaction-modal'
 
@@ -11,6 +13,7 @@ type TransactionListProps = {
   rows: TransactionRow[]
   categories: Category[]
   accounts: { id: string; name: string }[]
+  cards: { id: string; name: string }[]
   mode: 'month' | 'search'
 }
 
@@ -26,10 +29,12 @@ function buildSections(rows: TransactionRow[], mode: 'month' | 'search'): Sectio
   ]
 }
 
-export function TransactionList({ rows, categories, accounts, mode }: TransactionListProps) {
+export function TransactionList({ rows, categories, accounts, cards, mode }: TransactionListProps) {
+  const router = useRouter()
   const [editing, setEditing] = useState<TransactionRow | null>(null)
   const categoryById = new Map(categories.map((category) => [category.id, category]))
   const accountName = new Map(accounts.map((account) => [account.id, account.name]))
+  const cardName = new Map(cards.map((card) => [card.id, card.name]))
 
   if (rows.length === 0) {
     return (
@@ -39,10 +44,22 @@ export function TransactionList({ rows, categories, accounts, mode }: Transactio
     )
   }
 
-  const labelFor = (row: TransactionRow) =>
-    row.type === 'transfer'
-      ? `${accountName.get(row.account_id) ?? '?'} → ${accountName.get(row.destination_account_id ?? '') ?? '?'}`
-      : (accountName.get(row.account_id) ?? '?')
+  const account = (id: string | null) => accountName.get(id ?? '') ?? '?'
+  const card = (id: string | null) => cardName.get(id ?? '') ?? '?'
+  const labelFor = (row: TransactionRow) => {
+    if (row.type === 'transfer') return `${account(row.account_id)} → ${account(row.destination_account_id)}`
+    if (row.type === 'invoice_payment') return `${account(row.account_id)} → ${card(row.credit_card_id)}`
+    return row.credit_card_id ? card(row.credit_card_id) : account(row.account_id)
+  }
+
+  // Pagamento de fatura se edita na tela da fatura
+  const open = (row: TransactionRow) => {
+    if (row.type === 'invoice_payment' && row.credit_card_id && row.card_invoices) {
+      router.push(invoiceHref(row.credit_card_id, row.card_invoices.closing_month))
+      return
+    }
+    setEditing(row)
+  }
 
   return (
     <>
@@ -59,8 +76,8 @@ export function TransactionList({ rows, categories, accounts, mode }: Transactio
                       <TransactionItem
                         row={row}
                         category={row.category_id ? categoryById.get(row.category_id) : undefined}
-                        accountLabel={labelFor(row)}
-                        onClick={() => setEditing(row)}
+                        sourceLabel={labelFor(row)}
+                        onClick={() => open(row)}
                       />
                     </li>
                   ))}
@@ -72,11 +89,12 @@ export function TransactionList({ rows, categories, accounts, mode }: Transactio
       </div>
       <TransactionModal
         open={editing !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditing(null)
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setEditing(null)
         }}
         transactionId={editing?.id}
         initial={editing ? rowToFormValues(editing) : undefined}
+        installment={editing ? installmentInfo(editing) : undefined}
       />
     </>
   )

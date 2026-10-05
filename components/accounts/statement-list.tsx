@@ -1,4 +1,4 @@
-import { ArrowLeftRight } from 'lucide-react'
+import { ArrowLeftRight, CreditCard } from 'lucide-react'
 import { CategoryIcon } from '@/components/categories/category-icon'
 import type { Category } from '@/lib/categories'
 import { formatISODateBR } from '@/lib/dates'
@@ -42,22 +42,25 @@ export function StatementList({ statement, categories, accountNames, initialBala
             const row = transaction.row
             const category = row.category_id ? categoryById.get(row.category_id) : undefined
             const isTransfer = row.type === 'transfer'
+            const isPayment = row.type === 'invoice_payment'
             const note =
               runningCents === null ? (row.status === 'pending' ? 'previsto' : 'antes do saldo inicial') : null
             const subtitle = [
               formatISODateBR(row.date),
               isTransfer
-                ? `${accountNames.get(row.account_id) ?? '?'} → ${accountNames.get(row.destination_account_id ?? '') ?? '?'}`
-                : category?.name,
+                ? `${accountNames.get(row.account_id ?? '') ?? '?'} → ${accountNames.get(row.destination_account_id ?? '') ?? '?'}`
+                : isPayment
+                  ? null
+                  : category?.name,
               note,
             ]
               .filter(Boolean)
               .join(' · ')
             return (
               <li key={row.id} className="flex items-center gap-3 px-4 py-3">
-                {isTransfer ? (
+                {isTransfer || isPayment ? (
                   <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted-foreground" aria-hidden>
-                    <ArrowLeftRight className="size-4" />
+                    {isPayment ? <CreditCard className="size-4" /> : <ArrowLeftRight className="size-4" />}
                   </span>
                 ) : (
                   <CategoryIcon name={category?.icon ?? 'circle-ellipsis'} color={category?.color ?? '#64748b'} />

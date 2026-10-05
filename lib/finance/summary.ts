@@ -7,12 +7,12 @@ export type MonthSummary = {
   balanceProjected: number
 }
 
-/** Receitas e despesas do mês, realizado x previsto. Transferências não entram (PRD 8.5). */
+/** Receitas e despesas do mês, realizado x previsto. Transferências e pagamentos de fatura não entram (PRD 8.5). */
 export function summarizeMonth(transactions: Pick<LedgerTransaction, 'type' | 'status' | 'amountCents'>[]): MonthSummary {
   const income = { paid: 0, pending: 0 }
   const expense = { paid: 0, pending: 0 }
   for (const tx of transactions) {
-    if (tx.type === 'transfer') continue
+    if (tx.type === 'transfer' || tx.type === 'invoice_payment') continue
     const bucket = tx.type === 'income' ? income : expense
     bucket[tx.status] += tx.amountCents
   }

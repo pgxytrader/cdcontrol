@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { inputToRow, pickDefaultAccountId, rowToFormValues, rowToInput, rowToLedger, type TransactionRow } from './transaction-mappers'
+import {
+  applyEffectiveStatus,
+  decodeSource,
+  encodeSource,
+  inputToRow,
+  installmentInfo,
+  pickDefaultAccountId,
+  pickDefaultSource,
+  rowToFormValues,
+  rowToLedger,
+  type TransactionRow,
+} from './transaction-mappers'
 import type { TransactionInput } from './validation/transaction'
 
 const row: TransactionRow = {
@@ -12,8 +23,14 @@ const row: TransactionRow = {
   category_id: 'cat-1',
   account_id: 'acc-1',
   destination_account_id: null,
+  credit_card_id: null,
+  invoice_id: null,
+  installment_plan_id: null,
+  installment_number: null,
   notes: null,
   created_at: '2026-10-04T12:00:00Z',
+  installment_plans: null,
+  card_invoices: null,
 }
 
 describe('mapeadores de lançamento', () => {
@@ -30,31 +47,43 @@ describe('mapeadores de lançamento', () => {
     })
   })
 
-  it('rowToInput e rowToFormValues', () => {
-    expect(rowToInput(row)).toEqual({
-      type: 'expense',
-      description: 'Padaria',
-      amountCents: 1250,
-      date: '2026-10-04',
-      status: 'paid',
-      accountId: 'acc-1',
-      notes: null,
-      categoryId: 'cat-1',
-    })
+  it('rowToFormValues', () => {
     expect(rowToFormValues({ ...row, type: 'transfer', category_id: null, destination_account_id: 'acc-2' })).toEqual({
       type: 'transfer',
       amountCents: 1250,
       description: 'Padaria',
       categoryId: '',
       accountId: 'acc-1',
+      creditCardId: '',
       destinationAccountId: 'acc-2',
       date: '2026-10-04',
       status: 'paid',
       notes: '',
+      installmentsCount: 1,
+      inProgress: false,
+      currentInstallment: 1,
     })
   })
 
-  it('inputToRow zera os campos do outro tipo (despesa ↔ transferência)', () => {
+  it('rowToFormValues de uma parcela no cartão', () => {
+    const installment = {
+      ...row,
+      account_id: null,
+      credit_card_id: 'card-1',
+      invoice_id: 'inv-1',
+      installment_plan_id: 'plan-1',
+      installment_number: 3,
+      installment_plans: { installments_count: 10 },
+    }
+    expect(rowToFormValues(installment)).toMatchObject({
+      accountId: '',
+      creditCardId: 'card-1',
+      installmentsCount: 10,
+      currentInstallment: 3,
+    })
+  })
+
+  it('inputToRow zera os campos do outro tipo e os do cartão', () => {
     const transfer: TransactionInput = {
       type: 'transfer',
       description: 'Reserva',
@@ -67,12 +96,55 @@ describe('mapeadores de lançamento', () => {
     }
     expect(inputToRow(transfer, 'house-1')).toMatchObject({ category_id: null, destination_account_id: 'acc-2' })
 
-    const expense: TransactionInput = { ...rowToInput(row) }
-    expect(inputToRow(expense, 'house-1')).toMatchObject({
+    const expense: TransactionInput = {
+      type: 'expense',
+      description: 'Padaria',
+      amountCents: 1250,
+      date: '2026-10-04',
+      status: 'paid',
+      accountId: 'acc-1',
+      notes: null,
+      categoryId: 'cat-1',
+    }
+    expect(inputToRow(expense, 'house-1')).toEqual({
       household_id: 'house-1',
+      type: 'expense',
+      description: 'Padaria',
+      amount_cents: 1250,
+      date: '2026-10-04',
+      status: 'paid',
+      account_id: 'acc-1',
+      notes: null,
       category_id: 'cat-1',
       destination_account_id: null,
+      credit_card_id: null,
+      invoice_id: null,
     })
+  })
+
+  it('encodeSource e decodeSource', () => {
+    expect(encodeSource({ accountId: 'a', creditCardId: '' })).toBe('account:a')
+    expect(encodeSource({ accountId: '', creditCardId: 'c' })).toBe('card:c')
+    expect(encodeSource({ accountId: '', creditCardId: '' })).toBe('')
+    expect(decodeSource('card:c')).toEqual({ accountId: '', creditCardId: 'c' })
+    expect(decodeSource('account:a')).toEqual({ accountId: 'a', creditCardId: '' })
+    expect(decodeSource('outra-coisa')).toEqual({ accountId: '', creditCardId: '' })
+  })
+
+  it('pickDefaultSource: último cartão ou conta da pessoa, senão a primeira conta, senão o primeiro cartão', () => {
+    const accounts = [{ id: 'a' }]
+    const cards = [{ id: 'c' }]
+    expect(pickDefaultSource(accounts, cards, null, 'c')).toEqual({ accountId: '', creditCardId: 'c' })
+    expect(pickDefaultSource(accounts, cards, 'a', 'arquivado')).toEqual({ accountId: 'a', creditCardId: '' })
+    expect(pickDefaultSource([], cards, null, null)).toEqual({ accountId: '', creditCardId: 'c' })
+    expect(pickDefaultSource([], [], null, null)).toEqual({ accountId: '', creditCardId: '' })
+  })
+
+  it('installmentInfo', () => {
+    expect(installmentInfo(row)).toBeUndefined()
+    expect(
+      installmentInfo({ ...row, installment_plan_id: 'plan-1', installment_number: 3, installment_plans: { installments_count: 10 } }),
+    ).toEqual({ number: 3, count: 10 })
   })
 
   it('pickDefaultAccountId usa a última conta se ainda estiver disponível', () => {
@@ -81,5 +153,13 @@ describe('mapeadores de lançamento', () => {
     expect(pickDefaultAccountId(accounts, 'arquivada')).toBe('a')
     expect(pickDefaultAccountId(accounts, null)).toBe('a')
     expect(pickDefaultAccountId([], 'b')).toBeNull()
+  })
+
+  it('applyEffectiveStatus: compra no cartão segue a data; em conta, o status salvo', () => {
+    const card = { ...row, account_id: null, credit_card_id: 'card-1', invoice_id: 'inv-1', status: 'pending' as const }
+    expect(applyEffectiveStatus(card, '2026-10-04').status).toBe('paid')
+    expect(applyEffectiveStatus({ ...card, date: '2026-11-04', status: 'paid' }, '2026-10-04').status).toBe('pending')
+    expect(applyEffectiveStatus({ ...row, status: 'pending' }, '2026-12-01').status).toBe('pending')
+    expect(applyEffectiveStatus(row, '2026-10-04')).toBe(row)
   })
 })
