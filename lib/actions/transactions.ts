@@ -6,9 +6,15 @@ import { getCurrentUser } from '@/lib/auth'
 import { getCurrentHousehold } from '@/lib/household'
 import { GENERIC_ERROR, translateError } from '@/lib/supabase/errors'
 import { createClient } from '@/lib/supabase/server'
-import { inputToRow, rowToInput, TRANSACTION_COLUMNS, type TransactionRow } from '@/lib/transaction-mappers'
+import { inputToRow } from '@/lib/transaction-mappers'
 import { uuidSchema } from '@/lib/validation/common'
-import { transactionSchema, transactionSnapshotSchema, type TransactionSnapshot } from '@/lib/validation/transaction'
+import { transactionSchema } from '@/lib/validation/transaction'
+import {
+  deletionSnapshotSchema,
+  TRANSACTION_RECORD_COLUMNS,
+  type DeletionSnapshot,
+  type TransactionRecord,
+} from '@/lib/validation/transaction-record'
 
 function done() {
   revalidatePath('/', 'layout')
@@ -26,12 +32,13 @@ export async function createTransaction(input: unknown): Promise<ActionResult<{ 
   if (error) return { ok: false, error: translateError(error) }
 
   // Lembra a conta usada por quem lançou (falha aqui não desfaz o lançamento)
-  await supabase.from('profiles').update({ last_account_id: parsed.data.accountId }).eq('user_id', user.id)
+  await supabase.from('profiles').update({ last_account_id: parsed.data.accountId, last_credit_card_id: null }).eq('user_id', user.id)
 
   done()
   return { ok: true, data: { id: data.id } }
 }
 
+/** Atualiza um lançamento em conta (também converte uma compra à vista no cartão em lançamento em conta). */
 export async function updateTransaction(id: unknown, input: unknown): Promise<ActionResult> {
   const parsedId = uuidSchema.safeParse(id)
   if (!parsedId.success) return { ok: false, error: GENERIC_ERROR }
@@ -46,6 +53,7 @@ export async function updateTransaction(id: unknown, input: unknown): Promise<Ac
     .from('transactions')
     .update(inputToRow(parsed.data, household.id))
     .eq('id', parsedId.data)
+    .is('installment_plan_id', null)
     .select('id')
   if (error) return { ok: false, error: translateError(error) }
   if (data.length === 0) return { ok: false, error: GENERIC_ERROR }
@@ -54,31 +62,38 @@ export async function updateTransaction(id: unknown, input: unknown): Promise<Ac
   return { ok: true, data: null }
 }
 
-export async function deleteTransaction(id: unknown): Promise<ActionResult<TransactionSnapshot>> {
+/** Exclui um lançamento sem plano (conta, cartão à vista, estorno ou pagamento de fatura). Parcelas: deleteInstallments. */
+export async function deleteTransaction(id: unknown): Promise<ActionResult<DeletionSnapshot>> {
   const parsedId = uuidSchema.safeParse(id)
   if (!parsedId.success) return { ok: false, error: GENERIC_ERROR }
 
   const supabase = await createClient()
-  const { data, error } = await supabase.from('transactions').delete().eq('id', parsedId.data).select(TRANSACTION_COLUMNS)
+  const { data, error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', parsedId.data)
+    .is('installment_plan_id', null)
+    .select(TRANSACTION_RECORD_COLUMNS)
   if (error) return { ok: false, error: translateError(error) }
-  const row = (data as TransactionRow[])[0]
-  if (!row) return { ok: false, error: GENERIC_ERROR }
+  if (data.length === 0) return { ok: false, error: GENERIC_ERROR }
 
   done()
-  return { ok: true, data: { id: row.id, input: rowToInput(row) } }
+  return { ok: true, data: { plan: null, rows: data as TransactionRecord[] } }
 }
 
-export async function restoreTransaction(snapshot: unknown): Promise<ActionResult> {
-  const parsed = transactionSnapshotSchema.safeParse(snapshot)
+/** "Desfazer": recria o plano (se veio) e as linhas com os mesmos ids. */
+export async function restoreTransactions(snapshot: unknown): Promise<ActionResult> {
+  const parsed = deletionSnapshotSchema.safeParse(snapshot)
   if (!parsed.success) return { ok: false, error: GENERIC_ERROR }
 
   const household = await getCurrentHousehold()
   if (!household) return { ok: false, error: translateError({ message: 'NO_HOUSEHOLD' }) }
 
   const supabase = await createClient()
-  const { error } = await supabase
-    .from('transactions')
-    .insert({ id: parsed.data.id, ...inputToRow(parsed.data.input, household.id) })
+  const { error } = await supabase.rpc('restore_transactions', {
+    p_plan: parsed.data.plan ? { ...parsed.data.plan, household_id: household.id } : null,
+    p_rows: parsed.data.rows.map((row) => ({ ...row, household_id: household.id })),
+  })
   if (error) return { ok: false, error: translateError(error) }
 
   done()

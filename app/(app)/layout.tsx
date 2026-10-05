@@ -3,6 +3,7 @@ import { BottomNav } from '@/components/layout/bottom-nav'
 import { Sidebar } from '@/components/layout/sidebar'
 import { TransactionFormDataProvider, type TransactionFormData } from '@/components/transactions/form-data-context'
 import { listAccounts } from '@/lib/accounts'
+import { listCardOptions } from '@/lib/cards'
 import { listCategories, topCategoryIds } from '@/lib/categories-query'
 import { getCurrentHousehold } from '@/lib/household'
 import { getMyProfile } from '@/lib/profile'
@@ -11,8 +12,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const household = await getCurrentHousehold()
   if (!household) redirect('/bem-vindo')
 
-  const [accounts, categories, topExpense, topIncome, profile] = await Promise.all([
+  const [accounts, cards, categories, topExpense, topIncome, profile] = await Promise.all([
     listAccounts({ includeArchived: true }),
+    listCardOptions(),
     listCategories(),
     topCategoryIds('expense'),
     topCategoryIds('income'),
@@ -27,9 +29,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       archived: account.archived,
       initialBalanceDate: account.initialBalanceDate,
     })),
+    cards,
     categories,
     topCategoryIds: { expense: topExpense, income: topIncome },
     lastAccountId: profile?.last_account_id ?? null,
+    lastCreditCardId: profile?.last_credit_card_id ?? null,
   }
 
   return (

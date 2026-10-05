@@ -194,6 +194,3 @@ export const transactionFormResolver: Resolver<TransactionFormValues> = async (v
   }
   return { values: {}, errors: errors as FieldErrors<TransactionFormValues> }
 }
-
-export const transactionSnapshotSchema = z.object({ id: z.uuid(), input: transactionSchema })
-export type TransactionSnapshot = { id: string; input: TransactionInput }

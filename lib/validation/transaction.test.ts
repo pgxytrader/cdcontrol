@@ -8,7 +8,6 @@ import {
   toTransactionInput,
   transactionFormResolver,
   transactionSchema,
-  transactionSnapshotSchema,
   type TransactionFormValues,
 } from './transaction'
 
@@ -72,11 +71,6 @@ describe('transactionSchema', () => {
   it('recusa data inexistente', () => {
     const result = transactionSchema.safeParse(toTransactionInput({ ...form, date: '2026-02-30' }))
     expect(result.error?.issues[0].message).toBe('Informe uma data válida.')
-  })
-
-  it('o snapshot aceita a saída do schema (desfazer exclusão)', () => {
-    const input = transactionSchema.parse(toTransactionInput(form))
-    expect(transactionSnapshotSchema.parse({ id: ACC_2, input }).input).toEqual(input)
   })
 })
 

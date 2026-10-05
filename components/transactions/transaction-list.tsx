@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { Category } from '@/lib/categories'
 import { groupByDay, groupByMonth, splitPending, type TransactionGroup } from '@/lib/transaction-grouping'
-import { rowToFormValues, type TransactionRow } from '@/lib/transaction-mappers'
+import { installmentInfo, rowToFormValues, type TransactionRow } from '@/lib/transaction-mappers'
 import { TransactionItem } from './transaction-item'
 import { TransactionModal } from './transaction-modal'
 
@@ -77,6 +77,7 @@ export function TransactionList({ rows, categories, accounts, mode }: Transactio
         }}
         transactionId={editing?.id}
         initial={editing ? rowToFormValues(editing) : undefined}
+        installment={editing ? installmentInfo(editing) : undefined}
       />
     </>
   )
